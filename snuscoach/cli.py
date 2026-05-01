@@ -17,6 +17,33 @@ except ImportError:
 from snuscoach import coach, db
 
 
+def _iterate_with_followups(initial_user_msg: str) -> tuple[list[dict], str]:
+    """Run an initial coach turn, then prompt for inline follow-ups.
+
+    Streams the first response, then loops on `you> ` prompts. Empty input
+    or EOF ends the conversation. Returns (full message history, last
+    assistant text). Use the second value when you need the iterated final
+    artifact (debrief summary, finalized post draft, etc.).
+    """
+    messages: list[dict] = [{"role": "user", "content": initial_user_msg}]
+    reply = coach.conversation(messages)
+    messages.append({"role": "assistant", "content": reply})
+    while True:
+        try:
+            print()
+            followup = input("you> (empty to finish) ").strip()
+        except EOFError:
+            print()
+            break
+        if not followup:
+            break
+        messages.append({"role": "user", "content": followup})
+        print("coach> ", end="", flush=True)
+        reply = coach.conversation(messages)
+        messages.append({"role": "assistant", "content": reply})
+    return messages, reply
+
+
 def _input_multiline(label: str, initial: str = "") -> str:
     """Open $EDITOR on a temp file for editable multiline input.
 
@@ -160,7 +187,7 @@ def cmd_post_draft(_args):
         2. A short coda: who else should see this, what to drop or shorten if I want a tighter version, and what the political move is here.
         """
     ).strip()
-    draft_output = coach.one_shot(user_msg)
+    _, draft_output = _iterate_with_followups(user_msg)
 
     print()
     answer = input("Did you publish this? Save to history? [y/N]: ").strip().lower()
@@ -206,6 +233,8 @@ def cmd_post_list(_args):
 def cmd_prep(_args):
     print("Pre-meeting prep brief.\n")
     title = input("Meeting title (e.g. '1:1 with Sarah', 'staff'): ").strip()
+    if not title:
+        sys.exit("Title is required.")
     attendees = input("Attendees (comma-separated names): ").strip()
     purpose = _input_multiline("Purpose / agenda / context (paste freely)")
     user_msg = textwrap.dedent(
@@ -228,7 +257,7 @@ def cmd_prep(_args):
         If you need information you don't have (about a stakeholder, the work, the org dynamics), ASK rather than guess.
         """
     ).strip()
-    coach.one_shot(user_msg)
+    _iterate_with_followups(user_msg)
 
 
 def cmd_debrief(_args):
@@ -278,7 +307,7 @@ def cmd_debrief(_args):
         """
     ).strip()
 
-    summary = coach.one_shot(user_msg)
+    _, summary = _iterate_with_followups(user_msg)
 
     print()
     answer = (
