@@ -231,6 +231,94 @@ def cmd_prep(_args):
     coach.one_shot(user_msg)
 
 
+def cmd_debrief(_args):
+    print("Post-meeting debrief.\n")
+    title = input("Meeting title (e.g. '1:1 with Sarah', 'staff'): ").strip()
+    if not title:
+        sys.exit("Title is required.")
+    attendees = input("Attendees (comma-separated): ").strip() or None
+
+    today = date.today().isoformat()
+    happened_at_raw = (
+        input(f"When did it happen? [YYYY-MM-DD, default {today}]: ").strip() or today
+    )
+    try:
+        happened_at = (
+            datetime.strptime(happened_at_raw, "%Y-%m-%d").date().isoformat()
+        )
+    except ValueError:
+        sys.exit(f"Invalid date '{happened_at_raw}'. Expected YYYY-MM-DD.")
+
+    notes = _input_multiline(
+        "Notes from the meeting (paste freely — what was said, what you felt, signals you noticed)"
+    )
+    if not notes:
+        sys.exit("Empty notes; nothing to debrief.")
+
+    user_msg = textwrap.dedent(
+        f"""
+        TASK: Post-meeting debrief.
+
+        Meeting: {title}
+        Attendees: {attendees or '(not specified)'}
+        Date: {happened_at}
+
+        Raw notes:
+        {notes}
+
+        Produce, in this order:
+        1. Concrete follow-ups I should commit to (with rough timing).
+        2. Political signals — what was actually being negotiated, who's aligned with whom, what's unsaid.
+        3. Credit & thanks list — who deserves a public or private acknowledgment, and from whom.
+        4. Items to escalate — anything my manager or skip should know, framed for them.
+        5. What I missed — likely interpretations of the meeting I haven't considered.
+        6. Coda: the single highest-leverage thing for me to do in the next 48 hours, and why.
+
+        Push back if my read of the meeting is naive or self-serving — don't validate by default.
+        """
+    ).strip()
+
+    summary = coach.one_shot(user_msg)
+
+    print()
+    answer = (
+        input("Save this debrief to your meeting log? [Y/n]: ").strip().lower()
+    )
+    if answer in ("n", "no"):
+        print("Not saved.")
+        return
+
+    mid = db.add_meeting(title, attendees, notes, summary, happened_at)
+    print(f"Saved meeting #{mid} ({title}, {happened_at}).")
+
+
+def cmd_meeting_list(_args):
+    rows = db.list_meetings()
+    if not rows:
+        print("No meetings logged yet. Run: snuscoach debrief")
+        return
+    for r in rows:
+        attendees = f" — {r['attendees']}" if r["attendees"] else ""
+        print(f"  #{r['id']} [{r['happened_at']}] {r['title']}{attendees}")
+
+
+def cmd_meeting_show(args):
+    m = db.get_meeting(args.id)
+    if not m:
+        sys.exit(f"No meeting #{args.id}.")
+    print(f"# {m['title']}")
+    if m["attendees"]:
+        print(f"Attendees: {m['attendees']}")
+    print(f"When: {m['happened_at']}")
+    print(f"Logged: {m['created_at']}")
+    print()
+    print("## Raw notes")
+    print(m["notes"] or "(none)")
+    print()
+    print("## Coach debrief")
+    print(m["coach_summary"] or "(none)")
+
+
 def cmd_chat(_args):
     print("Open coaching chat. Type 'exit' or Ctrl-D to quit.\n")
     messages: list[dict] = []
@@ -287,6 +375,19 @@ def main():
     post_sub.add_parser("list", help="List saved posts").set_defaults(func=cmd_post_list)
 
     sub.add_parser("prep", help="Pre-meeting prep brief").set_defaults(func=cmd_prep)
+    sub.add_parser(
+        "debrief", help="Post-meeting debrief (saves to meeting log)"
+    ).set_defaults(func=cmd_debrief)
+
+    meeting_parser = sub.add_parser("meeting", help="Browse the meeting log")
+    meeting_sub = meeting_parser.add_subparsers(dest="sub", required=True)
+    meeting_sub.add_parser("list", help="List logged meetings").set_defaults(
+        func=cmd_meeting_list
+    )
+    meeting_show = meeting_sub.add_parser("show", help="Show one meeting in full")
+    meeting_show.add_argument("id", type=int)
+    meeting_show.set_defaults(func=cmd_meeting_show)
+
     sub.add_parser("chat", help="Open coaching chat").set_defaults(func=cmd_chat)
 
     args = parser.parse_args()

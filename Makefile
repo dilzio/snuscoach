@@ -1,4 +1,4 @@
-.PHONY: help install init chat post posts prep stakeholders stakeholder-add stakeholder-show wins win-add clean
+.PHONY: help install init chat post posts prep debrief meetings meeting-show stakeholders stakeholder-add stakeholder-show wins win-add test clean
 
 SNUSCOACH := .venv/bin/snuscoach
 
@@ -39,6 +39,16 @@ posts:  ## List saved posts
 prep:  ## Pre-meeting prep brief
 	$(SNUSCOACH) prep
 
+debrief:  ## Post-meeting debrief (saves to meeting log)
+	$(SNUSCOACH) debrief
+
+meetings:  ## List logged meetings
+	$(SNUSCOACH) meeting list
+
+meeting-show:  ## Show one meeting in full (required: id=N)
+	@if [ -z "$(id)" ]; then echo "Usage: make meeting-show id=N"; exit 1; fi
+	$(SNUSCOACH) meeting show $(id)
+
 stakeholders:  ## List all stakeholders
 	$(SNUSCOACH) stakeholder list
 
@@ -54,6 +64,9 @@ wins:  ## List logged wins
 
 win-add:  ## Log a new win
 	$(SNUSCOACH) win add
+
+test:  ## Run the integration test suite
+	.venv/bin/pytest
 
 clean:  ## Remove venv and build artifacts
 	rm -rf .venv build dist *.egg-info
