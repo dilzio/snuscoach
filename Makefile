@@ -1,22 +1,25 @@
-.PHONY: help install init chat post posts prep briefs brief-show debrief meetings meeting-show stakeholders stakeholder-add stakeholder-show wins win-add test clean
+.PHONY: help install init chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add backup-db test clean
 
 SNUSCOACH := .venv/bin/snuscoach
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-	@printf '\n\033[1mPost lifecycle (make post)\033[0m\n'
-	@printf '  1. Pick audience, paste the work — coach streams a draft.\n'
-	@printf '  2. Prompt: "Did you publish this? Save to history? [y/N]"\n'
-	@printf '  3. If y: $$EDITOR opens pre-loaded with the draft — trim to exactly\n'
-	@printf '     what you posted, save, quit.\n'
-	@printf '  4. Prompt: channel (e.g. Slack #engineering, email to Sarah, wiki).\n'
-	@printf '  5. Prompt: posted date (default today).\n'
-	@printf '  6. Saved. Future prep/post/chat sees this in the coach context —\n'
-	@printf '     it learns your voice and avoids repeating itself.\n'
-	@printf '\n\033[1mWhy save matters\033[0m\n'
-	@printf '  Post history is the highest-signal voice training data the coach\n'
-	@printf '  has. After 5-10 finalized posts, drafts start sounding like you\n'
-	@printf '  instead of like an LLM.\n'
+	@printf '\n\033[1mMeeting lifecycle\033[0m\n'
+	@printf '  Each meeting is one row holding both prep and debrief. Recurring\n'
+	@printf '  meetings (1:1s, staff) belong to a series so the coach sees thread\n'
+	@printf '  continuity across them.\n\n'
+	@printf '  1. (optional) make series-add — define a recurring thread once.\n'
+	@printf '  2. make prep — picker shows recent meetings; pick or create new.\n'
+	@printf '     For new: title, date, attendees, attach to series. Coach streams\n'
+	@printf '     a brief; iterate via the you> loop; save.\n'
+	@printf '  3. make debrief — same picker; for the same meeting after it happens.\n'
+	@printf '     Coach has the prep in context. Iterate, save.\n'
+	@printf '  4. make meeting-edit id=N — fix any field after the fact (title,\n'
+	@printf '     date, series, raw inputs, coach outputs).\n\n'
+	@printf '\033[1mWhy save matters\033[0m\n'
+	@printf '  Saved posts and meeting summaries feed the coach context next time.\n'
+	@printf '  After 5-10 saves, drafts/briefs sound like you and reference past\n'
+	@printf '  meetings in the same series — that is the compounding context.\n'
 
 install:  ## Create venv and install snuscoach (run once)
 	python3 -m venv .venv
@@ -24,7 +27,7 @@ install:  ## Create venv and install snuscoach (run once)
 	.venv/bin/pip install -e . --quiet
 	@echo "Installed. Set ANTHROPIC_API_KEY in .env, then run: make init"
 
-init:  ## Initialize the local SQLite database
+init:  ## Initialize / migrate the local SQLite database
 	$(SNUSCOACH) init
 
 chat:  ## Open coaching chat
@@ -36,25 +39,39 @@ post:  ## Draft a visibility post (offers to save on publish)
 posts:  ## List saved posts
 	$(SNUSCOACH) post list
 
-prep:  ## Pre-meeting prep brief (saves to brief history)
-	$(SNUSCOACH) prep
+prep:  ## Pre-meeting prep (alias for: meeting prep)
+	$(SNUSCOACH) meeting prep
 
-briefs:  ## List saved prep briefs
-	$(SNUSCOACH) brief list
+debrief:  ## Post-meeting debrief (alias for: meeting debrief)
+	$(SNUSCOACH) meeting debrief
 
-brief-show:  ## Show one prep brief in full (required: id=N)
-	@if [ -z "$(id)" ]; then echo "Usage: make brief-show id=N"; exit 1; fi
-	$(SNUSCOACH) brief show $(id)
-
-debrief:  ## Post-meeting debrief (saves to meeting log)
-	$(SNUSCOACH) debrief
-
-meetings:  ## List logged meetings
+meetings:  ## List recent meetings
 	$(SNUSCOACH) meeting list
+
+meeting-create:  ## Create a new meeting (interactive)
+	$(SNUSCOACH) meeting create
 
 meeting-show:  ## Show one meeting in full (required: id=N)
 	@if [ -z "$(id)" ]; then echo "Usage: make meeting-show id=N"; exit 1; fi
 	$(SNUSCOACH) meeting show $(id)
+
+meeting-edit:  ## Edit a meeting field (required: id=N)
+	@if [ -z "$(id)" ]; then echo "Usage: make meeting-edit id=N"; exit 1; fi
+	$(SNUSCOACH) meeting edit $(id)
+
+series:  ## List all meeting series
+	$(SNUSCOACH) series list
+
+series-add:  ## Create a new meeting series
+	$(SNUSCOACH) series add
+
+series-show:  ## Show a series and its meetings (required: id=N)
+	@if [ -z "$(id)" ]; then echo "Usage: make series-show id=N"; exit 1; fi
+	$(SNUSCOACH) series show $(id)
+
+series-edit:  ## Edit a series (required: id=N)
+	@if [ -z "$(id)" ]; then echo "Usage: make series-edit id=N"; exit 1; fi
+	$(SNUSCOACH) series edit $(id)
 
 stakeholders:  ## List all stakeholders
 	$(SNUSCOACH) stakeholder list
@@ -71,6 +88,14 @@ wins:  ## List logged wins
 
 win-add:  ## Log a new win
 	$(SNUSCOACH) win add
+
+backup-db:  ## Snapshot the local DB to a timestamped backup file
+	@if [ ! -f "$$HOME/.snuscoach/snuscoach.db" ]; then \
+		echo "No DB at ~/.snuscoach/snuscoach.db — nothing to back up."; \
+		exit 0; \
+	fi
+	cp "$$HOME/.snuscoach/snuscoach.db" "$$HOME/.snuscoach/snuscoach.db.backup-$$(date +%Y%m%d-%H%M%S)"
+	@echo "Backed up to ~/.snuscoach/snuscoach.db.backup-$$(date +%Y%m%d-%H%M%S)"
 
 test:  ## Run the integration test suite
 	.venv/bin/pytest

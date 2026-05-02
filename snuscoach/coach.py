@@ -22,13 +22,13 @@ def _system_blocks() -> list[dict]:
     wins = db.list_wins()
     posts = db.list_posts()
     meetings = db.list_meetings()
-    prep_briefs = db.list_prep_briefs()
+    meeting_series = db.list_meeting_series()
     return [
         {"type": "text", "text": prompts.SYSTEM},
         {
             "type": "text",
             "text": prompts.context_block(
-                stakeholders, wins, posts, meetings, prep_briefs
+                stakeholders, wins, posts, meetings, meeting_series
             ),
             "cache_control": {"type": "ephemeral"},
         },

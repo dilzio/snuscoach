@@ -1,8 +1,7 @@
-"""Integration tests for the debrief flow.
+"""Integration tests for `cmd_meeting_debrief` (post-meeting flow).
 
-Drives `cli.cmd_debrief` directly with monkeypatched I/O. Real SQLite
-underneath (per-test temp DB via conftest). Only the LLM call is mocked —
-that's the API boundary, hitting Claude in tests would cost money and be flaky.
+Mirrors test_prep.py: covers the picker, the run, edit/redo/cancel branches
+when a debrief already exists, and persistence to the meetings table.
 """
 import pytest
 
@@ -14,154 +13,124 @@ def _stub_inputs(monkeypatch, answers):
     monkeypatch.setattr("builtins.input", lambda _prompt="": next(it))
 
 
-def test_debrief_saves_when_user_accepts(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        [
-            "1:1 with Sarah",  # title
-            "Sarah Chen",  # attendees
-            "2026-04-30",  # happened_at
-            "",  # follow-up: empty → end conversation loop
-            "y",  # save? (anything not n/no saves)
-        ],
-    )
-    monkeypatch.setattr(
-        cli,
-        "_input_multiline",
-        lambda *a, **kw: "She wants me on the platform reorg.",
-    )
-    monkeypatch.setattr(
-        cli.coach,
-        "conversation",
-        lambda _msgs: "1. Send proposal by Friday.\n2. Loop in Mike.",
-    )
-
-    cli.cmd_debrief(None)
-
-    rows = db.list_meetings()
-    assert len(rows) == 1
-    row = rows[0]
-    assert row["title"] == "1:1 with Sarah"
-    assert row["attendees"] == "Sarah Chen"
-    assert row["happened_at"] == "2026-04-30"
-    assert "Send proposal by Friday" in row["coach_summary"]
-    assert "platform reorg" in row["notes"]
+class _Args:
+    def __init__(self, id=None):
+        self.id = id
 
 
-def test_debrief_default_save_is_yes(monkeypatch, temp_db):
-    """Empty answer to 'Save? [Y/n]' should save (capital Y is the default)."""
-    _stub_inputs(
-        monkeypatch,
-        ["Solo think", "", "2026-05-01", "", ""],
-    )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Some notes.")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "summary text")
+# ---- explicit-id path ----
 
-    cli.cmd_debrief(None)
 
-    assert len(db.list_meetings()) == 1
+def test_debrief_runs_coach_when_no_existing(monkeypatch, temp_db):
+    mid = db.add_meeting("1:1 with Sarah", "2026-05-05", attendees="Sarah")
+
+    _stub_inputs(monkeypatch, ["", "y"])  # follow-up empty, save yes
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "raw notes")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "Summary content.")
+
+    cli.cmd_meeting_debrief(_Args(id=mid))
+
+    m = db.get_meeting(mid)
+    assert m["debrief_notes"] == "raw notes"
+    assert m["debrief_summary"] == "Summary content."
+
+
+def test_debrief_saves_last_iterated_summary(monkeypatch, temp_db):
+    mid = db.add_meeting("X", "2026-05-05")
+    _stub_inputs(monkeypatch, ["push back", "tighten", "", "y"])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "notes")
+
+    replies = iter(["FIRST", "SECOND", "THIRD"])
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
+
+    cli.cmd_meeting_debrief(_Args(id=mid))
+    assert db.get_meeting(mid)["debrief_summary"] == "THIRD"
 
 
 def test_debrief_skips_save_when_user_declines(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        ["1:1 with Sarah", "", "", "", "n"],
-    )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Some notes.")
+    mid = db.add_meeting("X", "2026-05-05")
+    _stub_inputs(monkeypatch, ["", "n"])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "notes")
     monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "summary")
 
-    cli.cmd_debrief(None)
-
-    assert db.list_meetings() == []
-
-
-def test_debrief_default_date_is_today(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        ["Today's standup debrief", "", "", "", "y"],
-    )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Notes.")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "summary")
-
-    cli.cmd_debrief(None)
-
-    from datetime import date
-
-    rows = db.list_meetings()
-    assert rows[0]["happened_at"] == date.today().isoformat()
-
-
-def test_debrief_saves_last_reply_after_multi_turn(monkeypatch, temp_db):
-    """Iterating with the coach should persist the LAST refined reply, not the first."""
-    _stub_inputs(
-        monkeypatch,
-        [
-            "1:1 with Sarah",
-            "",
-            "2026-05-01",
-            "Actually it was about the reorg, not just status",  # follow-up 1
-            "And she pushed back on my hiring asks",  # follow-up 2
-            "",  # end loop
-            "y",  # save
-        ],
-    )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Initial notes.")
-
-    replies = iter(["FIRST draft summary", "SECOND refined summary", "THIRD final summary"])
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
-
-    cli.cmd_debrief(None)
-
-    rows = db.list_meetings()
-    assert len(rows) == 1
-    assert rows[0]["coach_summary"] == "THIRD final summary"
-
-
-def test_debrief_eof_during_followup_ends_conversation(monkeypatch, temp_db):
-    """Ctrl-D at the follow-up prompt should end the loop cleanly and proceed to save."""
-
-    inputs = iter([
-        "1:1 with Sarah",
-        "",
-        "2026-05-01",
-    ])
-
-    def _input(_prompt=""):
-        try:
-            return next(inputs)
-        except StopIteration:
-            raise EOFError
-
-    monkeypatch.setattr("builtins.input", _input)
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Notes.")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "summary")
-
-    # The save prompt comes after the follow-up loop. EOF on the follow-up
-    # exits the loop, then the save prompt itself raises StopIteration → EOFError
-    # via input(), which input() converts back to EOFError. We expect this to
-    # bubble up unhandled (the save flow doesn't catch EOF), so we wrap in
-    # pytest.raises. The point is the loop itself handled EOF cleanly.
-    with pytest.raises(EOFError):
-        cli.cmd_debrief(None)
-
-
-def test_debrief_rejects_empty_title(monkeypatch, temp_db):
-    _stub_inputs(monkeypatch, [""])
-    with pytest.raises(SystemExit):
-        cli.cmd_debrief(None)
-    assert db.list_meetings() == []
-
-
-def test_debrief_rejects_invalid_date(monkeypatch, temp_db):
-    _stub_inputs(monkeypatch, ["title", "", "not-a-date"])
-    with pytest.raises(SystemExit):
-        cli.cmd_debrief(None)
-    assert db.list_meetings() == []
+    cli.cmd_meeting_debrief(_Args(id=mid))
+    assert db.get_meeting(mid)["debrief_summary"] is None
 
 
 def test_debrief_rejects_empty_notes(monkeypatch, temp_db):
-    _stub_inputs(monkeypatch, ["title", "", ""])
+    mid = db.add_meeting("X", "2026-05-05")
     monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "")
+
     with pytest.raises(SystemExit):
-        cli.cmd_debrief(None)
-    assert db.list_meetings() == []
+        cli.cmd_meeting_debrief(_Args(id=mid))
+
+
+# ---- existing-debrief branches ----
+
+
+def test_debrief_edit_branch_opens_editor_seeded(monkeypatch, temp_db):
+    mid = db.add_meeting(
+        "X", "2026-05-05", debrief_notes="n", debrief_summary="OLD summary"
+    )
+    _stub_inputs(monkeypatch, ["e"])
+
+    seeds: list[str] = []
+
+    def _multi(_label, initial=""):
+        seeds.append(initial)
+        return "EDITED summary"
+
+    monkeypatch.setattr(cli, "_input_multiline", _multi)
+
+    coach_calls = []
+    monkeypatch.setattr(
+        cli.coach, "conversation", lambda _msgs: coach_calls.append(1) or "x"
+    )
+
+    cli.cmd_meeting_debrief(_Args(id=mid))
+
+    assert seeds == ["OLD summary"]
+    assert coach_calls == []
+    assert db.get_meeting(mid)["debrief_summary"] == "EDITED summary"
+
+
+def test_debrief_redo_branch_reruns_coach(monkeypatch, temp_db):
+    mid = db.add_meeting("X", "2026-05-05", debrief_notes="n", debrief_summary="OLD")
+    _stub_inputs(monkeypatch, ["r", "", "y"])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "fresh notes")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "NEW")
+
+    cli.cmd_meeting_debrief(_Args(id=mid))
+    m = db.get_meeting(mid)
+    assert m["debrief_summary"] == "NEW"
+    assert m["debrief_notes"] == "fresh notes"
+
+
+def test_debrief_cancel_branch_writes_nothing(monkeypatch, temp_db):
+    mid = db.add_meeting("X", "2026-05-05", debrief_summary="OLD")
+    _stub_inputs(monkeypatch, ["c"])
+
+    cli.cmd_meeting_debrief(_Args(id=mid))
+    assert db.get_meeting(mid)["debrief_summary"] == "OLD"
+
+
+# ---- picker path ----
+
+
+def test_debrief_no_id_picker_picks_existing(monkeypatch, temp_db):
+    target_id = db.add_meeting("Target", "2026-05-05")
+
+    _stub_inputs(monkeypatch, ["1", "", "y"])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "n")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "summary")
+
+    cli.cmd_meeting_debrief(_Args(id=None))
+    assert db.get_meeting(target_id)["debrief_summary"] == "summary"
+
+
+# ---- guards ----
+
+
+def test_debrief_with_unknown_id_exits(monkeypatch, temp_db):
+    with pytest.raises(SystemExit):
+        cli.cmd_meeting_debrief(_Args(id=9999))
