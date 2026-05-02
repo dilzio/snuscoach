@@ -1,8 +1,9 @@
-"""Integration tests for the pre-meeting prep flow.
+"""Integration tests for `cmd_meeting_prep`.
 
-Covers input handling, the multi-turn follow-up loop (which fixes the
-clarifying-questions-with-nowhere-to-answer bug), and persistence to the
-prep_briefs table.
+Covers the meeting picker, the prep run, the edit/redo/cancel branches when
+a prep already exists, and persistence to the meetings table.
+
+Real SQLite via temp_db fixture; only `coach.conversation` is mocked.
 """
 import pytest
 
@@ -14,169 +15,205 @@ def _stub_inputs(monkeypatch, answers):
     monkeypatch.setattr("builtins.input", lambda _prompt="": next(it))
 
 
-def test_prep_runs_one_turn_when_followup_empty(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        [
-            "1:1 with Frekus",  # title
-            "Matt, Frekus",  # attendees
-            "2026-05-05",  # prep_for
-            "",  # follow-up: empty → end loop after first reply
-            "y",  # save? yes
-        ],
+class _Args:
+    def __init__(self, id=None):
+        self.id = id
+
+
+# ---- explicit-id path ----
+
+
+def test_prep_runs_coach_when_no_existing_prep(monkeypatch, temp_db):
+    mid = db.add_meeting("1:1 with Sarah", "2026-05-05", attendees="Sarah")
+
+    _stub_inputs(monkeypatch, ["", "y"])  # follow-up empty, save yes
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "context body")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "Brief content.")
+
+    cli.cmd_meeting_prep(_Args(id=mid))
+
+    m = db.get_meeting(mid)
+    assert m["prep_context"] == "context body"
+    assert m["prep_brief"] == "Brief content."
+
+
+def test_prep_reuses_existing_context(monkeypatch, temp_db):
+    """If prep_context is already set, cmd_meeting_prep doesn't open the editor."""
+    mid = db.add_meeting(
+        "1:1 with Sarah",
+        "2026-05-05",
+        prep_context="reorg context already here",
     )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Architecture buy-in update.")
 
-    calls: list[list[dict]] = []
-
-    def _conv(messages):
-        calls.append(list(messages))
-        return "Provisional brief — three clarifying questions first."
-
-    monkeypatch.setattr(cli.coach, "conversation", _conv)
-
-    cli.cmd_prep(None)
-
-    # Exactly one model call when the user immediately ends the loop
-    assert len(calls) == 1
-    # First call has just the seeded user message
-    assert len(calls[0]) == 1
-    assert calls[0][0]["role"] == "user"
-    assert "Pre-meeting prep brief" in calls[0][0]["content"]
-
-
-def test_prep_iterates_when_user_answers_followup(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        [
-            "1:1 with Frekus",
-            "Matt, Frekus",
-            "2026-05-05",
-            "Yes — Frekus has seen designs",  # answers a clarifying question
-            "And the architecture connects to acquisition integration",
-            "",  # end loop
-            "y",  # save
-        ],
+    _stub_inputs(monkeypatch, ["", "y"])
+    multiline_calls: list[str] = []
+    monkeypatch.setattr(
+        cli, "_input_multiline", lambda label, **kw: multiline_calls.append(label) or ""
     )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Architecture update.")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "Brief.")
 
-    calls: list[int] = []
+    cli.cmd_meeting_prep(_Args(id=mid))
 
-    def _conv(messages):
-        calls.append(len(messages))
-        return f"Reply #{len(calls)}"
-
-    monkeypatch.setattr(cli.coach, "conversation", _conv)
-
-    cli.cmd_prep(None)
-
-    # Three model calls: initial + two follow-ups
-    assert len(calls) == 3
-    # Message history grows by 2 each turn (user + assistant), starting at 1 user
-    assert calls == [1, 3, 5]
-
-
-def test_prep_saves_to_brief_history(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        [
-            "1:1 with Frekus",
-            "Matt, Frekus",
-            "2026-05-05",
-            "",  # end loop
-            "y",  # save
-        ],
-    )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Architecture update.")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "The brief content.")
-
-    cli.cmd_prep(None)
-
-    rows = db.list_prep_briefs()
-    assert len(rows) == 1
-    assert rows[0]["title"] == "1:1 with Frekus"
-    assert rows[0]["attendees"] == "Matt, Frekus"
-    assert rows[0]["prep_for"] == "2026-05-05"
-    assert rows[0]["context"] == "Architecture update."
-    assert rows[0]["brief"] == "The brief content."
+    # Editor should NOT have been invoked for prep context (reused from DB)
+    assert multiline_calls == []
+    m = db.get_meeting(mid)
+    assert m["prep_context"] == "reorg context already here"
+    assert m["prep_brief"] == "Brief."
 
 
 def test_prep_saves_last_iterated_brief(monkeypatch, temp_db):
-    """The persisted brief is the LAST coach reply, not the first rough draft."""
+    mid = db.add_meeting("1:1 with Sarah", "2026-05-05")
     _stub_inputs(
         monkeypatch,
-        [
-            "1:1 with Frekus",
-            "",
-            "2026-05-05",
-            "Push back on this draft",  # follow-up
-            "And tighten section 3",  # follow-up
-            "",  # end loop
-            "y",  # save
-        ],
-    )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Context.")
-
-    replies = iter(["FIRST rough", "SECOND refined", "THIRD final"])
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
-
-    cli.cmd_prep(None)
-
-    rows = db.list_prep_briefs()
-    assert len(rows) == 1
-    assert rows[0]["brief"] == "THIRD final"
-
-
-def test_prep_default_save_is_yes(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        ["title", "", "2026-05-05", "", ""],
+        ["push back on this", "tighten section 3", "", "y"],
     )
     monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "context")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "brief")
 
-    cli.cmd_prep(None)
+    replies = iter(["FIRST", "SECOND", "THIRD final"])
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
 
-    assert len(db.list_prep_briefs()) == 1
+    cli.cmd_meeting_prep(_Args(id=mid))
+    assert db.get_meeting(mid)["prep_brief"] == "THIRD final"
 
 
 def test_prep_skips_save_when_user_declines(monkeypatch, temp_db):
+    mid = db.add_meeting("X", "2026-05-05")
+    _stub_inputs(monkeypatch, ["", "n"])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "context")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "brief")
+
+    cli.cmd_meeting_prep(_Args(id=mid))
+    assert db.get_meeting(mid)["prep_brief"] is None
+
+
+# ---- existing-prep branches: edit / redo / cancel ----
+
+
+def test_prep_edit_branch_opens_editor_seeded_with_existing(monkeypatch, temp_db):
+    mid = db.add_meeting(
+        "X", "2026-05-05", prep_context="ctx", prep_brief="OLD brief"
+    )
+    _stub_inputs(monkeypatch, ["e"])
+
+    seeds: list[str] = []
+
+    def _multi(_label, initial=""):
+        seeds.append(initial)
+        return "EDITED brief"
+
+    monkeypatch.setattr(cli, "_input_multiline", _multi)
+
+    coach_calls = []
+    monkeypatch.setattr(
+        cli.coach, "conversation", lambda _msgs: coach_calls.append(1) or "x"
+    )
+
+    cli.cmd_meeting_prep(_Args(id=mid))
+
+    assert seeds == ["OLD brief"]
+    assert coach_calls == []  # edit branch must NOT call the coach
+    assert db.get_meeting(mid)["prep_brief"] == "EDITED brief"
+
+
+def test_prep_redo_branch_reruns_coach(monkeypatch, temp_db):
+    mid = db.add_meeting(
+        "X", "2026-05-05", prep_context="ctx", prep_brief="OLD"
+    )
+    _stub_inputs(monkeypatch, ["r", "", "y"])  # redo, no follow-up, save
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "shouldn't be called")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "NEW brief")
+
+    cli.cmd_meeting_prep(_Args(id=mid))
+    assert db.get_meeting(mid)["prep_brief"] == "NEW brief"
+
+
+def test_prep_cancel_branch_writes_nothing(monkeypatch, temp_db):
+    mid = db.add_meeting(
+        "X", "2026-05-05", prep_context="ctx", prep_brief="OLD"
+    )
+    _stub_inputs(monkeypatch, ["c"])
+
+    coach_calls = []
+    monkeypatch.setattr(
+        cli.coach, "conversation", lambda _msgs: coach_calls.append(1) or "x"
+    )
+
+    cli.cmd_meeting_prep(_Args(id=mid))
+    assert coach_calls == []
+    assert db.get_meeting(mid)["prep_brief"] == "OLD"  # unchanged
+
+
+def test_prep_default_choice_when_existing_is_redo(monkeypatch, temp_db):
+    mid = db.add_meeting(
+        "X", "2026-05-05", prep_context="ctx", prep_brief="OLD"
+    )
+    # Empty answer for the edit/redo/cancel prompt → defaults to redo
+    _stub_inputs(monkeypatch, ["", "", "y"])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "x")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "NEW")
+
+    cli.cmd_meeting_prep(_Args(id=mid))
+    assert db.get_meeting(mid)["prep_brief"] == "NEW"
+
+
+# ---- no-id picker: pick existing ----
+
+
+def test_prep_no_id_picker_picks_existing_meeting(monkeypatch, temp_db):
+    db.add_meeting("Older", "2026-04-15")
+    target_id = db.add_meeting("Target", "2026-05-05")
+    db.add_meeting("Newer", "2026-05-10")
+
+    # Picker shows newest first: [1] Newer, [2] Target, [3] Older
+    _stub_inputs(monkeypatch, ["2", "", "y"])  # pick Target, no follow-up, save
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "ctx")
+    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "brief")
+
+    cli.cmd_meeting_prep(_Args(id=None))
+
+    m = db.get_meeting(target_id)
+    assert m["prep_brief"] == "brief"
+
+
+def test_prep_no_id_no_meetings_creates_new(monkeypatch, temp_db):
+    """First-run flow: no meetings → create new inline."""
     _stub_inputs(
         monkeypatch,
-        ["title", "", "2026-05-05", "", "n"],
+        [
+            # _create_meeting_interactive
+            "1:1 with Sarah",  # title
+            "2026-05-05",  # date
+            "Sarah",  # attendees
+            # _pick_or_create_series with no series existing
+            "",  # default Y to create
+            # _create_series_interactive
+            "",  # series name (defaults to title)
+            "",  # description
+            # back in cmd_meeting_prep
+            "",  # follow-up empty
+            "y",  # save
+        ],
     )
     monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "context")
     monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "brief")
 
-    cli.cmd_prep(None)
+    cli.cmd_meeting_prep(_Args(id=None))
 
-    assert db.list_prep_briefs() == []
+    rows = db.list_meetings()
+    assert len(rows) == 1
+    m = rows[0]
+    assert m["title"] == "1:1 with Sarah"
+    assert m["prep_brief"] == "brief"
 
-
-def test_prep_default_date_is_today(monkeypatch, temp_db):
-    _stub_inputs(
-        monkeypatch,
-        ["title", "", "", "", "y"],
-    )
-    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "context")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "brief")
-
-    cli.cmd_prep(None)
-
-    from datetime import date
-
-    rows = db.list_prep_briefs()
-    assert rows[0]["prep_for"] == date.today().isoformat()
+    series = db.list_meeting_series()
+    assert len(series) == 1
+    assert series[0]["name"] == "1:1 with Sarah"
+    assert m["series_id"] == series[0]["id"]
 
 
-def test_prep_rejects_empty_title(monkeypatch, temp_db):
-    _stub_inputs(monkeypatch, [""])
+# ---- guards ----
+
+
+def test_prep_with_unknown_id_exits(monkeypatch, temp_db):
     with pytest.raises(SystemExit):
-        cli.cmd_prep(None)
-
-
-def test_prep_rejects_invalid_date(monkeypatch, temp_db):
-    _stub_inputs(monkeypatch, ["title", "", "garbage-date"])
-    with pytest.raises(SystemExit):
-        cli.cmd_prep(None)
-    assert db.list_prep_briefs() == []
+        cli.cmd_meeting_prep(_Args(id=9999))

@@ -7,7 +7,14 @@
       "Bash(git add *)",
       "Bash(cat)",
       "Bash(git commit *)",
-      "Bash(rm /tmp/commitmsg)"
+      "Bash(rm /tmp/commitmsg)",
+      "Bash(.venv/bin/pytest)",
+      "Bash(sqlite3 ~/.snuscoach/snuscoach.db \".schema meetings\")",
+      "Bash(sqlite3 ~/.snuscoach/snuscoach.db \"SELECT count\\(*\\) FROM meetings; SELECT count\\(*\\) FROM prep_briefs;\")",
+      "Bash(.venv/bin/snuscoach init *)",
+      "Bash(sqlite3 ~/.snuscoach/snuscoach.db \".schema meeting_series\")",
+      "Bash(sqlite3 ~/.snuscoach/snuscoach.db \".tables\")",
+      "Bash(make)"
     ]
   }
 }

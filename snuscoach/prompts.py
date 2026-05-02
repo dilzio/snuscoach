@@ -28,7 +28,7 @@ def context_block(
     wins: list,
     posts: list,
     meetings: list,
-    prep_briefs: list,
+    meeting_series: list,
 ) -> str:
     parts = ["# STAKEHOLDERS"]
     if stakeholders:
@@ -69,29 +69,67 @@ def context_block(
     else:
         parts.append("(none recorded yet)")
 
-    parts.append(
-        "\n# MEETING LOG (most recent first — debrief summaries from past meetings)"
-    )
-    if meetings:
-        for m in meetings[:20]:
-            attendees = f" — {m['attendees']}" if m["attendees"] else ""
-            parts.append(f"\n## {m['happened_at']} — {m['title']}{attendees}")
-            if m["coach_summary"]:
-                parts.append(m["coach_summary"])
-            elif m["notes"]:
-                parts.append(f"(raw notes only) {m['notes']}")
-    else:
-        parts.append("(none recorded yet)")
-
-    parts.append(
-        "\n# PREP BRIEFS (most recent first — what was planned before past meetings)"
-    )
-    if prep_briefs:
-        for p in prep_briefs[:20]:
-            attendees = f" — {p['attendees']}" if p["attendees"] else ""
-            parts.append(f"\n## {p['prep_for']} — {p['title']}{attendees}")
-            parts.append(p["brief"])
-    else:
-        parts.append("(none recorded yet)")
+    parts.append(_render_meetings_block(meetings, meeting_series))
 
     return "\n".join(parts)
+
+
+def _render_meetings_block(meetings: list, meeting_series: list) -> str:
+    """Render meetings grouped by series, with one-offs at the end.
+
+    Each meeting shows its prep brief and debrief summary together so the
+    coach sees the full lifecycle and the thread continuity within a series.
+    """
+    parts = [
+        "\n# MEETINGS (grouped by series — use thread continuity to spot patterns)"
+    ]
+    if not meetings and not meeting_series:
+        parts.append("(none recorded yet)")
+        return "\n".join(parts)
+
+    series_by_id = {s["id"]: s for s in meeting_series}
+    by_series: dict = {}
+    one_offs: list = []
+    for m in meetings:
+        sid = m["series_id"]
+        if sid is None:
+            one_offs.append(m)
+        else:
+            by_series.setdefault(sid, []).append(m)
+
+    # Order series sections by most recent meeting in each series
+    def _series_recency(sid: int) -> str:
+        rows = by_series.get(sid, [])
+        return rows[0]["date"] if rows else ""
+
+    for sid in sorted(by_series.keys(), key=_series_recency, reverse=True):
+        series = series_by_id.get(sid)
+        if not series:
+            continue
+        desc = f" — {series['description']}" if series["description"] else ""
+        parts.append(f"\n## SERIES: {series['name']}{desc}")
+        for m in by_series[sid][:15]:
+            parts.append(_render_meeting_entry(m))
+
+    if one_offs:
+        parts.append("\n## ONE-OFF MEETINGS")
+        for m in one_offs[:15]:
+            parts.append(_render_meeting_entry(m))
+
+    return "\n".join(parts)
+
+
+def _render_meeting_entry(m) -> str:
+    attendees = f" — {m['attendees']}" if m["attendees"] else ""
+    out = [f"\n### {m['date']} — {m['title']}{attendees}"]
+    if m["prep_brief"]:
+        out.append(f"Prep: {m['prep_brief']}")
+    elif m["prep_context"]:
+        out.append(f"Prep (raw context only): {m['prep_context']}")
+    if m["debrief_summary"]:
+        out.append(f"Debrief: {m['debrief_summary']}")
+    elif m["debrief_notes"]:
+        out.append(f"Debrief (raw notes only): {m['debrief_notes']}")
+    if len(out) == 1:
+        out.append("(no prep or debrief yet)")
+    return "\n".join(out)

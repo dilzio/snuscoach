@@ -49,9 +49,9 @@ class TestCliDispatch:
             "win",
             "post",
             "prep",
-            "brief",
             "debrief",
             "meeting",
+            "series",
             "chat",
         ]:
             assert cmd in r.stdout, f"missing {cmd} in help: {r.stdout}"
@@ -71,13 +71,19 @@ class TestCliDispatch:
             ["post", "draft", "--help"],
             ["post", "list", "--help"],
             ["prep", "--help"],
-            ["brief", "--help"],
-            ["brief", "list", "--help"],
-            ["brief", "show", "--help"],
             ["debrief", "--help"],
             ["meeting", "--help"],
+            ["meeting", "create", "--help"],
+            ["meeting", "prep", "--help"],
+            ["meeting", "debrief", "--help"],
+            ["meeting", "edit", "--help"],
             ["meeting", "list", "--help"],
             ["meeting", "show", "--help"],
+            ["series", "--help"],
+            ["series", "add", "--help"],
+            ["series", "list", "--help"],
+            ["series", "show", "--help"],
+            ["series", "edit", "--help"],
             ["chat", "--help"],
         ],
     )
@@ -98,7 +104,7 @@ class TestCliDispatch:
             ["win", "list"],
             ["post", "list"],
             ["meeting", "list"],
-            ["brief", "list"],
+            ["series", "list"],
         ]:
             r = _run(args, env)
             assert r.returncode == 0, f"{args} failed: {r.stderr}"
