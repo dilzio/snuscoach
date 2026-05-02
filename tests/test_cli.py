@@ -49,6 +49,7 @@ class TestCliDispatch:
             "win",
             "post",
             "prep",
+            "brief",
             "debrief",
             "meeting",
             "chat",
@@ -70,6 +71,9 @@ class TestCliDispatch:
             ["post", "draft", "--help"],
             ["post", "list", "--help"],
             ["prep", "--help"],
+            ["brief", "--help"],
+            ["brief", "list", "--help"],
+            ["brief", "show", "--help"],
             ["debrief", "--help"],
             ["meeting", "--help"],
             ["meeting", "list", "--help"],
@@ -94,6 +98,7 @@ class TestCliDispatch:
             ["win", "list"],
             ["post", "list"],
             ["meeting", "list"],
+            ["brief", "list"],
         ]:
             r = _run(args, env)
             assert r.returncode == 0, f"{args} failed: {r.stderr}"

@@ -1,4 +1,4 @@
-.PHONY: help install init chat post posts prep debrief meetings meeting-show stakeholders stakeholder-add stakeholder-show wins win-add test clean
+.PHONY: help install init chat post posts prep briefs brief-show debrief meetings meeting-show stakeholders stakeholder-add stakeholder-show wins win-add test clean
 
 SNUSCOACH := .venv/bin/snuscoach
 
@@ -36,8 +36,15 @@ post:  ## Draft a visibility post (offers to save on publish)
 posts:  ## List saved posts
 	$(SNUSCOACH) post list
 
-prep:  ## Pre-meeting prep brief
+prep:  ## Pre-meeting prep brief (saves to brief history)
 	$(SNUSCOACH) prep
+
+briefs:  ## List saved prep briefs
+	$(SNUSCOACH) brief list
+
+brief-show:  ## Show one prep brief in full (required: id=N)
+	@if [ -z "$(id)" ]; then echo "Usage: make brief-show id=N"; exit 1; fi
+	$(SNUSCOACH) brief show $(id)
 
 debrief:  ## Post-meeting debrief (saves to meeting log)
 	$(SNUSCOACH) debrief
