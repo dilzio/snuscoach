@@ -14,7 +14,8 @@
       "Bash(.venv/bin/snuscoach init *)",
       "Bash(sqlite3 ~/.snuscoach/snuscoach.db \".schema meeting_series\")",
       "Bash(sqlite3 ~/.snuscoach/snuscoach.db \".tables\")",
-      "Bash(make)"
+      "Bash(make)",
+      "Bash(git pull *)"
     ]
   }
 }
