@@ -58,6 +58,16 @@ def init_db() -> None:
                 posted_at TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS prep_briefs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                attendees TEXT,
+                context TEXT,
+                brief TEXT NOT NULL,
+                prep_for TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             """
         )
         _migrate(conn)
@@ -170,4 +180,38 @@ def get_meeting(meeting_id: int):
     with connect() as conn:
         return conn.execute(
             "SELECT * FROM meetings WHERE id = ?", (meeting_id,)
+        ).fetchone()
+
+
+def add_prep_brief(
+    title: str,
+    attendees: str | None,
+    context: str | None,
+    brief: str,
+    prep_for: str,
+) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            """INSERT INTO prep_briefs
+                 (title, attendees, context, brief, prep_for, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (title, attendees, context, brief, prep_for, _now()),
+        )
+        return cur.lastrowid
+
+
+def list_prep_briefs(limit: int = 50) -> list:
+    with connect() as conn:
+        return list(
+            conn.execute(
+                "SELECT * FROM prep_briefs ORDER BY prep_for DESC, id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        )
+
+
+def get_prep_brief(brief_id: int):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM prep_briefs WHERE id = ?", (brief_id,)
         ).fetchone()

@@ -235,14 +235,26 @@ def cmd_prep(_args):
     title = input("Meeting title (e.g. '1:1 with Sarah', 'staff'): ").strip()
     if not title:
         sys.exit("Title is required.")
-    attendees = input("Attendees (comma-separated names): ").strip()
+    attendees = input("Attendees (comma-separated names): ").strip() or None
+
+    today = date.today().isoformat()
+    prep_for_raw = (
+        input(f"Meeting date [YYYY-MM-DD, default {today}]: ").strip() or today
+    )
+    try:
+        prep_for = datetime.strptime(prep_for_raw, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        sys.exit(f"Invalid date '{prep_for_raw}'. Expected YYYY-MM-DD.")
+
     purpose = _input_multiline("Purpose / agenda / context (paste freely)")
+
     user_msg = textwrap.dedent(
         f"""
         TASK: Pre-meeting prep brief.
 
         Meeting: {title}
-        Attendees: {attendees}
+        Attendees: {attendees or '(not specified)'}
+        Meeting date: {prep_for}
         Context:
         {purpose}
 
@@ -257,7 +269,18 @@ def cmd_prep(_args):
         If you need information you don't have (about a stakeholder, the work, the org dynamics), ASK rather than guess.
         """
     ).strip()
-    _iterate_with_followups(user_msg)
+    _, brief = _iterate_with_followups(user_msg)
+
+    print()
+    answer = (
+        input("Save this prep brief? [Y/n]: ").strip().lower()
+    )
+    if answer in ("n", "no"):
+        print("Not saved.")
+        return
+
+    bid = db.add_prep_brief(title, attendees, purpose or None, brief, prep_for)
+    print(f"Saved prep brief #{bid} ({title}, {prep_for}).")
 
 
 def cmd_debrief(_args):
@@ -319,6 +342,33 @@ def cmd_debrief(_args):
 
     mid = db.add_meeting(title, attendees, notes, summary, happened_at)
     print(f"Saved meeting #{mid} ({title}, {happened_at}).")
+
+
+def cmd_brief_list(_args):
+    rows = db.list_prep_briefs()
+    if not rows:
+        print("No prep briefs saved yet. Run: snuscoach prep")
+        return
+    for r in rows:
+        attendees = f" — {r['attendees']}" if r["attendees"] else ""
+        print(f"  #{r['id']} [{r['prep_for']}] {r['title']}{attendees}")
+
+
+def cmd_brief_show(args):
+    b = db.get_prep_brief(args.id)
+    if not b:
+        sys.exit(f"No prep brief #{args.id}.")
+    print(f"# {b['title']}")
+    if b["attendees"]:
+        print(f"Attendees: {b['attendees']}")
+    print(f"Meeting date: {b['prep_for']}")
+    print(f"Logged: {b['created_at']}")
+    print()
+    print("## Context")
+    print(b["context"] or "(none)")
+    print()
+    print("## Brief")
+    print(b["brief"])
 
 
 def cmd_meeting_list(_args):
@@ -403,10 +453,21 @@ def main():
     )
     post_sub.add_parser("list", help="List saved posts").set_defaults(func=cmd_post_list)
 
-    sub.add_parser("prep", help="Pre-meeting prep brief").set_defaults(func=cmd_prep)
+    sub.add_parser(
+        "prep", help="Pre-meeting prep brief (saves to brief history)"
+    ).set_defaults(func=cmd_prep)
     sub.add_parser(
         "debrief", help="Post-meeting debrief (saves to meeting log)"
     ).set_defaults(func=cmd_debrief)
+
+    brief_parser = sub.add_parser("brief", help="Browse saved prep briefs")
+    brief_sub = brief_parser.add_subparsers(dest="sub", required=True)
+    brief_sub.add_parser("list", help="List saved prep briefs").set_defaults(
+        func=cmd_brief_list
+    )
+    brief_show = brief_sub.add_parser("show", help="Show one prep brief in full")
+    brief_show.add_argument("id", type=int)
+    brief_show.set_defaults(func=cmd_brief_show)
 
     meeting_parser = sub.add_parser("meeting", help="Browse the meeting log")
     meeting_sub = meeting_parser.add_subparsers(dest="sub", required=True)
