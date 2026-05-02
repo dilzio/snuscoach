@@ -23,7 +23,9 @@ The sections below give you Matt's current political landscape. They may be spar
 """
 
 
-def context_block(stakeholders: list, wins: list, posts: list) -> str:
+def context_block(
+    stakeholders: list, wins: list, posts: list, meetings: list
+) -> str:
     parts = ["# STAKEHOLDERS"]
     if stakeholders:
         for s in stakeholders:
@@ -60,6 +62,20 @@ def context_block(stakeholders: list, wins: list, posts: list) -> str:
                 f"\n## {p['posted_at']} — {p['channel']}{audience}"
             )
             parts.append(p["content"])
+    else:
+        parts.append("(none recorded yet)")
+
+    parts.append(
+        "\n# MEETING LOG (most recent first — debrief summaries from past meetings)"
+    )
+    if meetings:
+        for m in meetings[:20]:
+            attendees = f" — {m['attendees']}" if m["attendees"] else ""
+            parts.append(f"\n## {m['happened_at']} — {m['title']}{attendees}")
+            if m["coach_summary"]:
+                parts.append(m["coach_summary"])
+            elif m["notes"]:
+                parts.append(f"(raw notes only) {m['notes']}")
     else:
         parts.append("(none recorded yet)")
 

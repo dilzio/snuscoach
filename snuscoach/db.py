@@ -60,6 +60,18 @@ def init_db() -> None:
             );
             """
         )
+        _migrate(conn)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Apply additive schema migrations to existing DBs."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(meetings)").fetchall()}
+    for col, ddl in [
+        ("happened_at", "TEXT"),
+        ("coach_summary", "TEXT"),
+    ]:
+        if col not in cols:
+            conn.execute(f"ALTER TABLE meetings ADD COLUMN {col} {ddl}")
 
 
 def _now() -> str:
@@ -127,11 +139,35 @@ def list_posts() -> list:
         )
 
 
-def add_meeting(title: str, attendees: str, purpose: str, notes: str = "") -> int:
+def add_meeting(
+    title: str,
+    attendees: str | None,
+    notes: str,
+    coach_summary: str,
+    happened_at: str,
+) -> int:
     with connect() as conn:
         cur = conn.execute(
-            """INSERT INTO meetings (title, attendees, purpose, notes, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (title, attendees, purpose, notes, _now()),
+            """INSERT INTO meetings
+                 (title, attendees, notes, coach_summary, happened_at, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (title, attendees, notes, coach_summary, happened_at, _now()),
         )
         return cur.lastrowid
+
+
+def list_meetings(limit: int = 50) -> list:
+    with connect() as conn:
+        return list(
+            conn.execute(
+                "SELECT * FROM meetings ORDER BY happened_at DESC, id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        )
+
+
+def get_meeting(meeting_id: int):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM meetings WHERE id = ?", (meeting_id,)
+        ).fetchone()
