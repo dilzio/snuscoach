@@ -15,7 +15,11 @@
       "Bash(sqlite3 ~/.snuscoach/snuscoach.db \".schema meeting_series\")",
       "Bash(sqlite3 ~/.snuscoach/snuscoach.db \".tables\")",
       "Bash(make)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(gh pr *)",
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(python3 -m pytest tests/ -q)",
+      "Bash(make test *)"
     ]
   }
 }
