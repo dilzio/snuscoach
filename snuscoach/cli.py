@@ -651,6 +651,60 @@ def cmd_meeting_show(args):
 
 
 # ---------------------------------------------------------------------------
+# Voice profile
+# ---------------------------------------------------------------------------
+
+
+def cmd_voice_add(_args):
+    description = input("Label (e.g. 'Slack #eng', 'weekly email to manager') — optional: ").strip() or None
+    content = _input_multiline("Paste a writing sample (something you actually wrote)")
+    if not content:
+        sys.exit("Empty sample; not saved.")
+    sid = db.add_voice_sample(content, description)
+    label = f" ({description})" if description else ""
+    print(f"Saved voice sample #{sid}{label}.")
+
+
+def cmd_voice_list(_args):
+    rows = db.list_voice_samples()
+    if not rows:
+        print("No voice samples yet. Run: snuscoach voice add")
+        return
+    for r in rows:
+        desc = f" — {r['description']}" if r["description"] else ""
+        snippet = r["content"].splitlines()[0][:80]
+        if len(r["content"].splitlines()[0]) > 80:
+            snippet += "…"
+        print(f"  #{r['id']} [{r['created_at'][:10]}]{desc}: {snippet}")
+
+
+def cmd_voice_show(args):
+    s = db.get_voice_sample(args.id)
+    if not s:
+        sys.exit(f"No voice sample #{args.id}.")
+    if s["description"]:
+        print(f"# Voice sample #{s['id']} — {s['description']}")
+    else:
+        print(f"# Voice sample #{s['id']}")
+    print(f"Added: {s['created_at']}")
+    print()
+    print(s["content"])
+
+
+def cmd_voice_delete(args):
+    s = db.get_voice_sample(args.id)
+    if not s:
+        sys.exit(f"No voice sample #{args.id}.")
+    desc = f" ({s['description']})" if s["description"] else ""
+    confirm = input(f"Delete voice sample #{args.id}{desc}? [y/N]: ").strip().lower()
+    if confirm not in ("y", "yes"):
+        print("Cancelled.")
+        return
+    db.delete_voice_sample(args.id)
+    print(f"Deleted voice sample #{args.id}.")
+
+
+# ---------------------------------------------------------------------------
 # Chat
 # ---------------------------------------------------------------------------
 
@@ -717,6 +771,18 @@ def main():
         "draft", help="Draft a visibility post (optionally save it)"
     ).set_defaults(func=cmd_post_draft)
     post_sub.add_parser("list", help="List saved posts").set_defaults(func=cmd_post_list)
+
+    # voice
+    voice_parser = sub.add_parser("voice", help="Voice profile: writing samples used when drafting")
+    voice_sub = voice_parser.add_subparsers(dest="sub", required=True)
+    voice_sub.add_parser("add", help="Add a writing sample").set_defaults(func=cmd_voice_add)
+    voice_sub.add_parser("list", help="List voice samples").set_defaults(func=cmd_voice_list)
+    voice_show = voice_sub.add_parser("show", help="Show one voice sample")
+    voice_show.add_argument("id", type=int)
+    voice_show.set_defaults(func=cmd_voice_show)
+    voice_delete = voice_sub.add_parser("delete", help="Delete a voice sample")
+    voice_delete.add_argument("id", type=int)
+    voice_delete.set_defaults(func=cmd_voice_delete)
 
     # series
     series_parser = sub.add_parser("series", help="Meeting series (recurring threads)")

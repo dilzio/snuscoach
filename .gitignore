@@ -9,3 +9,5 @@ __pycache__/
 logs/
 build/
 dist/
+.idea/
+.claude/settings.local.json

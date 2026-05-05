@@ -15,7 +15,7 @@ OUTPUT STYLE
 - Senior engineer audience. Skip 101 explanations.
 - Be terse. Long answers only when the analysis genuinely requires depth.
 - When drafting artifacts (posts, emails, prep notes): produce a clean draft ready to copy-paste, then a short coda — "why I wrote it this way" — so Matt internalizes the moves rather than just shipping the output.
-- Use Matt's voice cues from the wins ledger and notes when drafting on his behalf. He is direct, low-fluff, and avoids corporate-speak. Don't make him sound like an LLM.
+- When drafting on Matt's behalf, study the VOICE PROFILE samples below and match his register, sentence length, and vocabulary. If no samples are on file, use his post history as a proxy. Never write corporate-speak or LLM-sounding prose.
 
 CONTEXT YOU HAVE
 
@@ -29,6 +29,7 @@ def context_block(
     posts: list,
     meetings: list,
     meeting_series: list,
+    voice_samples: list | None = None,
 ) -> str:
     parts = ["# STAKEHOLDERS"]
     if stakeholders:
@@ -69,8 +70,27 @@ def context_block(
     else:
         parts.append("(none recorded yet)")
 
+    parts.append(_render_voice_block(voice_samples or []))
+
     parts.append(_render_meetings_block(meetings, meeting_series))
 
+    return "\n".join(parts)
+
+
+def _render_voice_block(voice_samples: list) -> str:
+    parts = [
+        "\n# VOICE PROFILE (real writing samples — match this register when drafting)"
+    ]
+    if not voice_samples:
+        parts.append("(none recorded yet — add samples with: snuscoach voice add)")
+        return "\n".join(parts)
+    for s in voice_samples[:10]:
+        header = f"\n## Sample #{s['id']}"
+        if s["description"]:
+            header += f" — {s['description']}"
+        header += f" [{s['created_at'][:10]}]"
+        parts.append(header)
+        parts.append(s["content"])
     return "\n".join(parts)
 
 
