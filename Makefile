@@ -1,9 +1,17 @@
-.PHONY: help install init profile-create profile-list chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean
+.PHONY: help install init profile-create profile-list profile-show chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean
 
 SNUSCOACH := .venv/bin/snuscoach
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@printf '\n\033[1mFirst-time setup\033[0m\n'
+	@printf '  \033[36mmake install\033[0m   create venv, install dependencies (once)\n'
+	@printf '  \033[36mmake init\033[0m      create / migrate the local SQLite DB (safe to re-run)\n'
+	@printf '  \033[36mmake profile-create\033[0m  interview-style intake: name, role, org context,\n'
+	@printf '    political strengths/weaknesses, coaching goals, communication style.\n'
+	@printf '    Required before any coaching command. Run once per coached user.\n'
+	@printf '  Multiple profiles are supported. Set \033[36mSNUSCOACH_PROFILE=Name\033[0m in .env\n'
+	@printf '  to select one; omit it to use the first profile created (the default).\n'
 	@printf '\n\033[1mMental model\033[0m\n'
 	@printf '  A MEETING is one row that holds both the prep brief (before) and the\n'
 	@printf '  debrief summary (after) — same identity across the whole lifecycle.\n'
@@ -110,6 +118,8 @@ help:  ## Show this help
 	@printf '  treat them as private. Inspect with: \033[36mtail -n 1 LOGFILE | jq .\033[0m\n'
 	@printf '\n\033[1mHow everything compounds\033[0m\n'
 	@printf '  Each command writes to ONE store; every command READS all of them.\n'
+	@printf '  • Create a user profile → your name, role, strengths, weaknesses, and\n'
+	@printf '    goals are injected into every coach turn via the system prompt.\n'
 	@printf '  • Add a stakeholder → every prep/debrief/post/chat sees their profile.\n'
 	@printf '  • Log a win → posts and prep briefs can pull from it; coach uses it\n'
 	@printf '    for perf-review framing.\n'
@@ -137,6 +147,10 @@ profile-create:  ## Create a new user profile (interview-style, required once)
 
 profile-list:  ## List all user profiles
 	$(SNUSCOACH) profile list
+
+profile-show:  ## Show one user profile (required: id=N)
+	@if [ -z "$(id)" ]; then echo "Usage: make profile-show id=N"; exit 1; fi
+	$(SNUSCOACH) profile show $(id)
 
 chat:  ## Open coaching chat
 	$(SNUSCOACH) chat
