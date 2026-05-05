@@ -40,12 +40,12 @@ The hypothesis: politics is a learnable skill, and most of its weight is *just d
 
 ## 5. User Stories (MVP)
 
-1. *As Matt, I want to describe my org once and have the coach remember it,* so I don't re-explain who's who every time.
-2. *As Matt, after a 1:1 with my manager, I want to dump notes and get back: what to follow up on, what to surface to my skip, what political signals I missed.*
-3. *As Matt, before a skip-level or staff meeting, I want a prep brief* — talking points, who to align with beforehand, what to avoid.
-4. *As Matt, when I close a meaningful piece of work, I want a draft visibility post* (Slack, internal wiki, email) calibrated to the audience.
-5. *As Matt, I want a weekly nudge* to update my brag doc and surface recent wins upward.
-6. *As Matt, when I describe a tense interaction, I want the coach to challenge my read* — not just validate me.
+1. *As the coached user, I want to describe my org once and have the coach remember it,* so I don't re-explain who's who every time.
+2. *As the coached user, after a 1:1 with my manager, I want to dump notes and get back: what to follow up on, what to surface to my skip, what political signals I missed.*
+3. *As the coached user, before a skip-level or staff meeting, I want a prep brief* — talking points, who to align with beforehand, what to avoid.
+4. *As the coached user, when I close a meaningful piece of work, I want a draft visibility post* (Slack, internal wiki, email) calibrated to the audience.
+5. *As the coached user, I want a weekly nudge* to update my brag doc and surface recent wins upward.
+6. *As the coached user, when I describe a tense interaction, I want the coach to challenge my read* — not just validate me.
 
 ## 6. Key Features
 
@@ -71,14 +71,14 @@ The hypothesis: politics is a learnable skill, and most of its weight is *just d
 
 ### 6.5 Context Ingestion
 - **Manual interview-style intake** (MVP): structured Q&A to seed org graph and personal context.
-- **System-initiated update prompts** (MVP): coach asks Matt for updates rather than scraping external systems — "anything new from your 1:1 this week?", "any standout PRs to log?", "what came out of the staff meeting?". This is the integration strategy: Matt is the integration.
+- **System-initiated update prompts** (MVP): coach asks the user for updates rather than scraping external systems — "anything new from your 1:1 this week?", "any standout PRs to log?", "what came out of the staff meeting?". This is the integration strategy: the user is the integration.
 - **Journaling / scheduled check-ins** (MVP): daily or weekly prompts ("how did standup go?", "any signals from skip this week?").
 - **Document upload** (Phase 2): paste/upload org charts, perf reviews, 1:1 notes, performance plans.
 - **No external integrations in scope.** Calendar, Slack, GitHub, Jira, email connectors are explicitly out for now. May revisit if user-prompted updates prove too high-friction in practice.
 
 ### 6.6 Proactivity
 - Reactive chat + scheduled nudges: daily journaling prompt, weekly brag review, pre-meeting reminders driven by user-entered cadence.
-- Coach-initiated update prompts (see §6.5) keep the political graph and wins ledger fresh without requiring Matt to remember to log things.
+- Coach-initiated update prompts (see §6.5) keep the political graph and wins ledger fresh without requiring the user to remember to log things.
 
 ## 7. Architecture & Technical Approach
 
@@ -106,7 +106,7 @@ Web app. Single-user. Conversational primary surface, with structured side panel
 | Phase | Scope | Goal |
 |---|---|---|
 | **0 — Spike** | Local SQLite + Claude API + CLI chat. Manual intake of one stakeholder, one drafted post, one meeting prep. | Prove the loop end-to-end. |
-| **1 — MVP** | Web chat UI. Stakeholder graph, brag ledger, visibility drafting, pre/post-meeting flows, scheduled nudges, journaling, coach-initiated update prompts. | Daily-driver tool for Matt. |
+| **1 — MVP** | Web chat UI. Stakeholder graph, brag ledger, visibility drafting, pre/post-meeting flows, scheduled nudges, journaling, coach-initiated update prompts. | Daily-driver tool for the coached user. |
 | **2 — Ingestion** | Document upload (perf reviews, org charts, 1:1 notes); smarter parsing of pasted artifacts into the graph. | Reduce manual transcription cost. |
 | **3 — Smarter coaching** | Cross-session pattern detection (recurring blind spots, stalled stakeholder relationships), voice-profile refinement, smarter timing of coach-initiated prompts. | Coach gets sharper as data accumulates. |
 
@@ -142,13 +142,13 @@ Personal-tool metrics — measured by you, on you:
 - **Form factor:** web app (not desktop/Tauri). Faster to iterate; backend stays local.
 - **Single-user only.** No future mentor-share mode in scope.
 - **No name redaction.** Trust Claude API privacy terms; rely on task-scoped slicing for blast-radius control.
-- **No direct external integrations.** Coach prompts Matt for updates; Matt is the integration.
+- **No direct external integrations.** Coach prompts the user for updates; the user is the integration.
 - **Name:** Snuscoach.
 
 ## 10. Verification / How to Validate
 
 - **Loop validation (Phase 0):** can the tool, in one session, ingest a stakeholder, accept a meeting note, and produce a usable post-meeting follow-up + visibility draft? If yes, loop works.
-- **Daily-driver validation (Phase 1):** Matt uses it every working day for 30 days. Brag entries, posts, meeting prep all flow through the tool.
+- **Daily-driver validation (Phase 1):** The coached user uses it every working day for 30 days. Brag entries, posts, meeting prep all flow through the tool.
 - **Skill-transfer validation (Phase 1+2):** quarterly self-assessment — situations user navigated well *without* tool prompting, attributable to internalized framework.
 - **Outcome validation (Phase 2+):** perf review cycle. Did manager/skip's written feedback shift toward language matching the visibility narrative the tool helped construct?
 

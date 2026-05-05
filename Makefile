@@ -1,4 +1,4 @@
-.PHONY: help install init chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean
+.PHONY: help install init profile-create profile-list chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean
 
 SNUSCOACH := .venv/bin/snuscoach
 
@@ -131,6 +131,12 @@ install:  ## Create venv and install snuscoach (run once)
 
 init:  ## Initialize / migrate the local SQLite database
 	$(SNUSCOACH) init
+
+profile-create:  ## Create a new user profile (interview-style, required once)
+	$(SNUSCOACH) profile create
+
+profile-list:  ## List all user profiles
+	$(SNUSCOACH) profile list
 
 chat:  ## Open coaching chat
 	$(SNUSCOACH) chat

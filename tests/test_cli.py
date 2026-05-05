@@ -45,6 +45,7 @@ class TestCliDispatch:
         # Every top-level subcommand should appear in help
         for cmd in [
             "init",
+            "profile",
             "stakeholder",
             "win",
             "post",
@@ -85,6 +86,10 @@ class TestCliDispatch:
             ["series", "show", "--help"],
             ["series", "edit", "--help"],
             ["chat", "--help"],
+            ["profile", "--help"],
+            ["profile", "create", "--help"],
+            ["profile", "list", "--help"],
+            ["profile", "show", "--help"],
         ],
     )
     def test_subcommand_help(self, args, isolated_db):
@@ -98,6 +103,15 @@ class TestCliDispatch:
         assert r.returncode == 0
         assert isolated_db.exists()
 
+        # Create a profile so list commands pass the profile check.
+        # Pipe answers: name, role, org_context, strengths, weaknesses, goals, comm_style
+        r = _run(
+            ["profile", "create"],
+            env,
+            input="Test User\nSWE\n\n\n\n\n\n",
+        )
+        assert r.returncode == 0, f"profile create failed: {r.stderr}"
+
         # Empty list paths should all exit 0 with a "no X yet" message
         for args in [
             ["stakeholder", "list"],
@@ -110,10 +124,9 @@ class TestCliDispatch:
             assert r.returncode == 0, f"{args} failed: {r.stderr}"
 
     def test_meeting_show_missing_id_exits_nonzero(self, isolated_db):
-        _run(["init"], {"SNUSCOACH_DB": str(isolated_db)})
-        r = _run(
-            ["meeting", "show", "9999"],
-            {"SNUSCOACH_DB": str(isolated_db)},
-        )
+        env = {"SNUSCOACH_DB": str(isolated_db)}
+        _run(["init"], env)
+        _run(["profile", "create"], env, input="Test User\nSWE\n\n\n\n\n\n")
+        r = _run(["meeting", "show", "9999"], env)
         assert r.returncode != 0
         assert "No meeting" in r.stderr or "No meeting" in r.stdout

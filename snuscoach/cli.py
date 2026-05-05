@@ -705,6 +705,83 @@ def cmd_voice_delete(args):
 
 
 # ---------------------------------------------------------------------------
+# User profiles
+# ---------------------------------------------------------------------------
+
+
+def _run_profile_interview() -> dict:
+    """Collect user profile data via structured CLI prompts. Returns the profile dict.
+
+    Name is required; all other fields are optional (empty input → None).
+    """
+    print("\nPress Enter to skip optional fields.\n")
+    name = input("Name (first name or whatever you go by): ").strip()
+    if not name:
+        sys.exit("Name is required.")
+    role = input("Role/title (e.g. 'Senior SWE', 'Staff Eng', 'EM'): ").strip() or None
+    org_context = (
+        input("Org context — company type, team size, reporting chain: ").strip() or None
+    )
+    political_strengths = (
+        input("Political strengths — what you're already good at politically: ").strip() or None
+    )
+    political_weaknesses = (
+        input("Political weaknesses — where you struggle or want to grow: ").strip() or None
+    )
+    coaching_goals = (
+        input("Coaching goals — what success looks like in 6–12 months: ").strip() or None
+    )
+    communication_style = (
+        input("Communication style — how you like to communicate: ").strip() or None
+    )
+    return {
+        "name": name,
+        "role": role,
+        "org_context": org_context,
+        "political_strengths": political_strengths,
+        "political_weaknesses": political_weaknesses,
+        "coaching_goals": coaching_goals,
+        "communication_style": communication_style,
+    }
+
+
+def cmd_profile_create(_args):
+    profile_data = _run_profile_interview()
+    pid = db.add_user_profile(profile_data)
+    print(f"\nProfile created (#{pid}): {profile_data['name']}")
+
+
+def cmd_profile_list(_args):
+    rows = db.list_user_profiles()
+    if not rows:
+        print("No profiles yet. Run: snuscoach profile create")
+        return
+    default_id = rows[0]["id"]
+    for r in rows:
+        role = f" — {r['role']}" if r["role"] else ""
+        marker = " (default)" if r["id"] == default_id else ""
+        print(f"  #{r['id']} {r['name']}{role}{marker} (created {r['created_at'][:10]})")
+
+
+def cmd_profile_show(args):
+    p = db.get_user_profile(args.id)
+    if not p:
+        sys.exit(f"No profile #{args.id}.")
+    print(f"# {p['name']}")
+    for label, key in [
+        ("Role", "role"),
+        ("Org context", "org_context"),
+        ("Political strengths", "political_strengths"),
+        ("Political weaknesses", "political_weaknesses"),
+        ("Coaching goals", "coaching_goals"),
+        ("Communication style", "communication_style"),
+    ]:
+        if p[key]:
+            print(f"{label}: {p[key]}")
+    print(f"\nCreated: {p['created_at'][:10]}")
+
+
+# ---------------------------------------------------------------------------
 # Chat
 # ---------------------------------------------------------------------------
 
@@ -730,6 +807,43 @@ def cmd_chat(_args):
 
 
 # ---------------------------------------------------------------------------
+# Startup profile check
+# ---------------------------------------------------------------------------
+
+
+def _ensure_active_profile() -> None:
+    """Validate or auto-create the active user profile before any coaching command.
+
+    Order of operations:
+    1. SNUSCOACH_PROFILE env var set → look up by name; error if not found.
+    2. No env var, no profiles in DB → run interview, create profile.
+    3. No env var, profiles exist → use the first (oldest) silently.
+    """
+    try:
+        profiles = db.list_user_profiles()
+    except Exception as exc:
+        if "no such table" in str(exc):
+            sys.exit("Database not initialized. Run: snuscoach init")
+        raise
+
+    profile_name = os.environ.get("SNUSCOACH_PROFILE", "").strip()
+    if profile_name:
+        if not db.get_user_profile_by_name(profile_name):
+            sys.exit(
+                f"ERROR: SNUSCOACH_PROFILE='{profile_name}' not found in the database.\n"
+                f"Run 'snuscoach profile list' to see available profiles, "
+                f"or 'snuscoach profile create' to create one."
+            )
+        return
+
+    if not profiles:
+        print("No user profile found. Let's create one.\n")
+        data = _run_profile_interview()
+        pid = db.add_user_profile(data)
+        print(f"\nProfile created (#{pid}): {data['name']}\n")
+
+
+# ---------------------------------------------------------------------------
 # Argparse
 # ---------------------------------------------------------------------------
 
@@ -744,6 +858,19 @@ def main():
     sub.add_parser("init", help="Initialize the local SQLite database").set_defaults(
         func=cmd_init
     )
+
+    # profile
+    profile_parser = sub.add_parser("profile", help="Manage user profiles")
+    profile_sub = profile_parser.add_subparsers(dest="sub", required=True)
+    profile_sub.add_parser(
+        "create", help="Create a new user profile (interview-style)"
+    ).set_defaults(func=cmd_profile_create)
+    profile_sub.add_parser("list", help="List all profiles").set_defaults(
+        func=cmd_profile_list
+    )
+    profile_show_p = profile_sub.add_parser("show", help="Show a profile by id")
+    profile_show_p.add_argument("id", type=int)
+    profile_show_p.set_defaults(func=cmd_profile_show)
 
     # stakeholder
     sk_parser = sub.add_parser("stakeholder", help="Manage stakeholder profiles")
@@ -847,6 +974,8 @@ def main():
 
     args = parser.parse_args()
     logger.set_command(_command_path(args))
+    if getattr(args, "func", None) not in _PROFILE_CHECK_SKIP:
+        _ensure_active_profile()
     args.func(args)
 
 
@@ -856,6 +985,16 @@ def _command_path(args) -> str:
     if sub:
         parts.append(sub)
     return " ".join(p for p in parts if p)
+
+
+# Commands that bypass the profile check. Assigned here so all handler
+# function objects are defined before this set is constructed.
+_PROFILE_CHECK_SKIP = frozenset({
+    cmd_init,
+    cmd_profile_create,
+    cmd_profile_list,
+    cmd_profile_show,
+})
 
 
 if __name__ == "__main__":
