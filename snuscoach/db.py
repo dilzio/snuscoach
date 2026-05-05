@@ -115,6 +115,13 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS voice_samples (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL
+        );
         """
     )
 
@@ -444,3 +451,36 @@ def get_meeting(meeting_id: int):
         return conn.execute(
             "SELECT * FROM meetings WHERE id = ?", (meeting_id,)
         ).fetchone()
+
+
+# ---- voice samples ----
+
+def add_voice_sample(content: str, description: str | None) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO voice_samples (content, description, created_at) VALUES (?, ?, ?)",
+            (content, description, _now()),
+        )
+        return cur.lastrowid
+
+
+def list_voice_samples() -> list:
+    with connect() as conn:
+        return list(
+            conn.execute(
+                "SELECT * FROM voice_samples ORDER BY created_at DESC, id DESC"
+            ).fetchall()
+        )
+
+
+def get_voice_sample(sample_id: int):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM voice_samples WHERE id = ?", (sample_id,)
+        ).fetchone()
+
+
+def delete_voice_sample(sample_id: int) -> bool:
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM voice_samples WHERE id = ?", (sample_id,))
+        return cur.rowcount > 0

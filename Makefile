@@ -1,4 +1,4 @@
-.PHONY: help install init chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add backup-db test clean
+.PHONY: help install init chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean
 
 SNUSCOACH := .venv/bin/snuscoach
 
@@ -113,6 +113,8 @@ help:  ## Show this help
 	@printf '  • Add a stakeholder → every prep/debrief/post/chat sees their profile.\n'
 	@printf '  • Log a win → posts and prep briefs can pull from it; coach uses it\n'
 	@printf '    for perf-review framing.\n'
+	@printf '  • Add a voice sample → drafts match your register; coach studies your\n'
+	@printf '    actual sentence rhythm, vocabulary, and tone before writing.\n'
 	@printf '  • Save a post → next draft sounds more like you and avoids repeating.\n'
 	@printf '  • Save a debrief → next prep for that series sees the thread,\n'
 	@printf '    grouped together so continuity is explicit.\n'
@@ -188,6 +190,16 @@ wins:  ## List logged wins
 
 win-add:  ## Log a new win
 	$(SNUSCOACH) win add
+
+voice-add:  ## Add a voice sample (writing you actually authored)
+	$(SNUSCOACH) voice add
+
+voice-list:  ## List voice samples
+	$(SNUSCOACH) voice list
+
+voice-show:  ## Show one voice sample (required: id=N)
+	@if [ -z "$(id)" ]; then echo "Usage: make voice-show id=N"; exit 1; fi
+	$(SNUSCOACH) voice show $(id)
 
 backup-db:  ## Snapshot the local DB to a timestamped backup file
 	@if [ ! -f "$$HOME/.snuscoach/snuscoach.db" ]; then \
