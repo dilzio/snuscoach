@@ -14,7 +14,7 @@ try:
 except ImportError:
     pass
 
-from snuscoach import coach, db
+from snuscoach import coach, db, logger
 
 
 # ---------------------------------------------------------------------------
@@ -780,7 +780,16 @@ def main():
     sub.add_parser("chat", help="Open coaching chat").set_defaults(func=cmd_chat)
 
     args = parser.parse_args()
+    logger.set_command(_command_path(args))
     args.func(args)
+
+
+def _command_path(args) -> str:
+    parts = [getattr(args, "cmd", None) or ""]
+    sub = getattr(args, "sub", None)
+    if sub:
+        parts.append(sub)
+    return " ".join(p for p in parts if p)
 
 
 if __name__ == "__main__":

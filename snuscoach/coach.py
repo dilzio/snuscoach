@@ -1,9 +1,10 @@
 import os
 import sys
+import time
 
 from anthropic import Anthropic
 
-from snuscoach import db, prompts
+from snuscoach import db, logger, prompts
 
 MODEL = "claude-opus-4-7"
 
@@ -37,20 +38,37 @@ def _system_blocks() -> list[dict]:
 
 def _stream(messages: list[dict]) -> str:
     client = _client()
+    system = _system_blocks()
     parts: list[str] = []
+    started = time.monotonic()
+    final_message = None
     with client.messages.stream(
         model=MODEL,
         max_tokens=32000,
         thinking={"type": "adaptive"},
         output_config={"effort": "high"},
-        system=_system_blocks(),
+        system=system,
         messages=messages,
     ) as stream:
         for text in stream.text_stream:
             print(text, end="", flush=True)
             parts.append(text)
         print()
-    return "".join(parts)
+        try:
+            final_message = stream.get_final_message()
+        except Exception:
+            final_message = None
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    response_text = "".join(parts)
+    logger.log_call(
+        system=system,
+        messages=messages,
+        response=response_text,
+        usage=getattr(final_message, "usage", None),
+        latency_ms=elapsed_ms,
+        model=MODEL,
+    )
+    return response_text
 
 
 def one_shot(user_message: str) -> str:
