@@ -159,6 +159,55 @@ def cmd_stakeholder_show(args):
             print(f"{label}: {s[key]}")
 
 
+def cmd_stakeholder_edit(args):
+    name = (getattr(args, "name", None) or "").strip() or input("Name: ").strip()
+    if not name:
+        sys.exit("Name is required.")
+    s = db.get_stakeholder(name)
+    if not s:
+        sys.exit(f"No stakeholder named '{name}'.")
+    fields = [
+        ("1", "Role", "role"),
+        ("2", "Relationship", "relationship"),
+        ("3", "Communication style", "communication_style"),
+        ("4", "What they reward", "what_they_reward"),
+        ("5", "Notes", "notes"),
+    ]
+    print(f"Editing {name}:")
+    for num, label, key in fields:
+        print(f"  [{num}] {label}: {s[key] or '(empty)'}")
+    choice = input("Field to edit [1-5]: ").strip()
+    matched = {num: (label, key) for num, label, key in fields}.get(choice)
+    if not matched:
+        sys.exit(f"Invalid choice: {choice}")
+    label, key = matched
+    if key == "notes":
+        new = _input_multiline("Notes", initial=s["notes"] or "")
+        db.update_stakeholder(name, notes=new or None)
+    else:
+        new = input(f"{label} [{s[key] or ''}]: ").strip()
+        db.update_stakeholder(name, **{key: new or None})
+    print("Updated.")
+
+
+def cmd_stakeholder_note(args):
+    name = (getattr(args, "name", None) or "").strip() or input("Name: ").strip()
+    if not name:
+        sys.exit("Name is required.")
+    s = db.get_stakeholder(name)
+    if not s:
+        sys.exit(f"No stakeholder named '{name}'.")
+    obs = input("Observation: ").strip()
+    if not obs:
+        sys.exit("Observation is required.")
+    today = date.today().isoformat()
+    entry = f"[{today}] {obs}"
+    existing = s["notes"] or ""
+    new_notes = f"{entry}\n\n{existing}" if existing else entry
+    db.update_stakeholder(name, notes=new_notes)
+    print(f"Note added to {name}.")
+
+
 def cmd_win_add(_args):
     title = input("Win title (one line): ").strip()
     if not title:
@@ -889,6 +938,14 @@ def main():
     sk_show = sk.add_parser("show", help="Show one stakeholder profile")
     sk_show.add_argument("name")
     sk_show.set_defaults(func=cmd_stakeholder_show)
+
+    sk_edit = sk.add_parser("edit", help="Edit a stakeholder profile field")
+    sk_edit.add_argument("name", nargs="?", help="Stakeholder name (prompted if omitted)")
+    sk_edit.set_defaults(func=cmd_stakeholder_edit)
+
+    sk_note = sk.add_parser("note", help="Append a dated observation to a stakeholder's notes")
+    sk_note.add_argument("name", nargs="?", help="Stakeholder name (prompted if omitted)")
+    sk_note.set_defaults(func=cmd_stakeholder_note)
 
     # win
     win_parser = sub.add_parser("win", help="Manage the brag ledger / wins")

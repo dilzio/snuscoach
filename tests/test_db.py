@@ -4,6 +4,7 @@ Real SQLite, real schema (per-test temp DB via conftest fixture). No mocks.
 Includes a migration test that seeds the old (meetings + prep_briefs) schema
 and asserts post-migration shape and data preservation.
 """
+import pytest
 import sqlite3
 
 from snuscoach import db
@@ -70,6 +71,42 @@ def test_stakeholder_round_trip(temp_db):
     assert len(rows) == 1
     assert rows[0]["name"] == "Sarah Chen"
     assert db.get_stakeholder("Sarah Chen")["relationship"] == "skip"
+
+
+def test_update_stakeholder_single_field(temp_db):
+    db.add_stakeholder({"name": "Sarah Chen", "role": "VP Eng", "relationship": "skip"})
+    db.update_stakeholder("Sarah Chen", role="CTO")
+    s = db.get_stakeholder("Sarah Chen")
+    assert s["role"] == "CTO"
+    assert s["relationship"] == "skip"
+
+
+def test_update_stakeholder_multiple_fields(temp_db):
+    db.add_stakeholder({"name": "Sarah Chen", "role": "VP Eng"})
+    db.update_stakeholder("Sarah Chen", role="CTO", notes="promoted in Q2")
+    s = db.get_stakeholder("Sarah Chen")
+    assert s["role"] == "CTO"
+    assert s["notes"] == "promoted in Q2"
+
+
+def test_update_stakeholder_updates_updated_at(temp_db):
+    db.add_stakeholder({"name": "Sarah Chen", "role": "VP Eng"})
+    before = db.get_stakeholder("Sarah Chen")["updated_at"]
+    db.update_stakeholder("Sarah Chen", role="CTO")
+    after = db.get_stakeholder("Sarah Chen")["updated_at"]
+    assert after >= before
+
+
+def test_update_stakeholder_rejects_unknown_field(temp_db):
+    db.add_stakeholder({"name": "Sarah Chen"})
+    with pytest.raises(ValueError, match="bogus"):
+        db.update_stakeholder("Sarah Chen", bogus="x")
+
+
+def test_update_stakeholder_noop_on_no_fields(temp_db):
+    db.add_stakeholder({"name": "Sarah Chen", "role": "VP Eng"})
+    db.update_stakeholder("Sarah Chen")
+    assert db.get_stakeholder("Sarah Chen")["role"] == "VP Eng"
 
 
 def test_win_round_trip(temp_db):
