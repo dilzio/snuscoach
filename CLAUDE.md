@@ -34,3 +34,42 @@ Working rules for the Snuscoach project. Honor these on every change. Matt will 
 - Product spec: `PRD.md` — read this before suggesting architectural changes. Phasing and non-goals are already locked.
 - Phase 0 spike is built (CLI + SQLite + Anthropic SDK with prompt caching). The existing baseline is untested; when you touch a path that lacks coverage, add it.
 - `make` (no target) lists every CLI command.
+
+## Commands
+
+```bash
+make install        # create venv and install snuscoach + dev deps
+make test           # run full pytest suite
+make init           # initialize / migrate the SQLite DB
+make                # list all CLI commands
+```
+
+Run a single test:
+```bash
+pytest tests/test_post.py::TestPostDraft::test_post_draft_saves_last_iterated_draft
+```
+
+Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). Optional overrides: `SNUSCOACH_DB`, `SNUSCOACH_PROFILE`, `SNUSCOACH_LOG_DIR`.
+
+## Architecture
+
+**Modules:**
+- `cli.py` — argparse routing and all command handlers; entry point is `main()`
+- `coach.py` — Anthropic SDK integration; exports `conversation()` (Opus) and `draft()` (Sonnet)
+- `db.py` — SQLite CRUD for all entities; `init_db()` is idempotent with migration support
+- `prompts.py` — builds system prompt (per-profile) and the cache-controlled context block (stakeholders, wins, posts, meetings, voice samples)
+- `logger.py` — appends one JSONL record per LLM call to `~/.snuscoach/logs/YYYY-MM-DD/HHMMSS.jsonl`
+
+**Model routing:**
+- `coach.conversation()` → Opus with adaptive thinking — used for coaching sessions (meeting prep, debrief, chat)
+- `coach.draft()` → Sonnet — used for post drafting (faster, no thinking)
+- Call sites in `cli.py` pass the right function via `_iterate_with_followups(coach_fn=coach.draft)`
+
+**Prompt caching:**
+- `system_prompt()` is ephemeral (changes per profile); `context_block()` is cache-controlled (stable across turns)
+- The cache-controlled block avoids re-sending the full stakeholder/meeting graph on every follow-up
+
+**Testing patterns:**
+- `test_cli.py` — subprocess tests against the installed binary; exercises argparse dispatch end-to-end
+- All other test files — call CLI functions directly; mock `input()`, `_input_multiline()`, and `coach.draft/conversation()`; use a real temp SQLite DB (never mock the DB)
+- `conftest.py` autouse fixtures handle isolation: temp DB path via `SNUSCOACH_DB`, logger reset, `SNUSCOACH_PROFILE` cleared

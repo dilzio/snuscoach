@@ -32,6 +32,15 @@ def isolated_logger(monkeypatch, tmp_path):
     logger._reset_for_tests()
 
 
+@pytest.fixture(autouse=True)
+def isolated_profile_env(monkeypatch):
+    """Always clear SNUSCOACH_PROFILE so .env values don't bleed into tests.
+
+    Tests that need a specific profile name can override it via monkeypatch.setenv.
+    """
+    monkeypatch.delenv("SNUSCOACH_PROFILE", raising=False)
+
+
 @pytest.fixture
 def temp_db(temp_db_path):
     """Initialized temp DB. Most tests use this."""

@@ -22,15 +22,20 @@ from snuscoach import coach, db, logger
 # ---------------------------------------------------------------------------
 
 
-def _iterate_with_followups(initial_user_msg: str) -> tuple[list[dict], str]:
+def _iterate_with_followups(
+    initial_user_msg: str,
+    coach_fn=None,
+) -> tuple[list[dict], str]:
     """Run an initial coach turn, then prompt for inline follow-ups.
 
-    Streams the first response, then loops on `you> ` prompts. Empty input
-    or EOF ends the conversation. Returns (full message history, last
-    assistant text).
+    coach_fn defaults to coach.conversation (Opus). Pass coach.draft for
+    drafting flows that should use Sonnet. All turns in the session use
+    the same function so the model is consistent throughout.
     """
+    if coach_fn is None:
+        coach_fn = coach.conversation
     messages: list[dict] = [{"role": "user", "content": initial_user_msg}]
-    reply = coach.conversation(messages)
+    reply = coach_fn(messages)
     messages.append({"role": "assistant", "content": reply})
     while True:
         try:
@@ -43,7 +48,7 @@ def _iterate_with_followups(initial_user_msg: str) -> tuple[list[dict], str]:
             break
         messages.append({"role": "user", "content": followup})
         print("coach> ", end="", flush=True)
-        reply = coach.conversation(messages)
+        reply = coach_fn(messages)
         messages.append({"role": "assistant", "content": reply})
     return messages, reply
 
@@ -198,7 +203,7 @@ def cmd_post_draft(_args):
         2. A short coda: who else should see this, what to drop or shorten if I want a tighter version, and what the political move is here.
         """
     ).strip()
-    _, draft_output = _iterate_with_followups(user_msg)
+    _, draft_output = _iterate_with_followups(user_msg, coach_fn=coach.draft)
 
     print()
     answer = input("Did you publish this? Save to history? [y/N]: ").strip().lower()

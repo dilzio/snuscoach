@@ -16,6 +16,12 @@ SNUSCOACH = Path(__file__).resolve().parent.parent / ".venv" / "bin" / "snuscoac
 
 def _run(args, env_overrides=None, **kwargs):
     env = os.environ.copy()
+    # Remove vars that would bleed test state from the developer's shell.
+    # Tests that need them can pass them explicitly via env_overrides.
+    # Neutralize SNUSCOACH_PROFILE so dotenv can't reload it from .env.
+    # Setting to "" keeps it in the env (so dotenv won't override) but
+    # _ensure_active_profile treats empty string as "not set".
+    env["SNUSCOACH_PROFILE"] = ""
     if env_overrides:
         env.update(env_overrides)
     return subprocess.run(

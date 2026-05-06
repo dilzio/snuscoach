@@ -106,19 +106,19 @@ These weren't explicitly called out in the PRD but fell out naturally or were re
 
 ## Technical Architecture vs PRD §7
 
-| PRD requirement | Status | Notes |
-|---|---|---|
-| Web app form factor (§7.1) | ❌ | CLI for now; web layer is the next big milestone |
-| Local SQLite (§7.2) | ✅ | `~/.snuscoach/snuscoach.db` |
-| Task-scoped context slicing (§7.2) | ⚠️ | Full graph sent on every turn; scoping not yet implemented |
-| Claude Opus for coaching (§7.3) | ✅ | All calls use `claude-opus-4-7` |
-| Claude Sonnet for routine drafting (§7.3) | ❌ | Everything goes to Opus; no routing yet |
-| Prompt caching (§7.3) | ✅ | Context block cache-controlled |
-| Pluggable provider interface (§7.3) | ❌ | Hardcoded Anthropic client |
+| PRD requirement | Status | Notes                                                                     |
+|---|--|---------------------------------------------------------------------------|
+| Web app form factor (§7.1) | ❌ | CLI for now; web layer is the next big milestone                          |
+| Local SQLite (§7.2) | ✅ | `~/.snuscoach/snuscoach.db`                                               |
+| Task-scoped context slicing (§7.2) | ⚠️ | Full graph sent on every turn; scoping not yet implemented                |
+| Claude Opus for coaching (§7.3) | ✅ | All calls use `claude-opus-4-7`                                           |
+| Claude Sonnet for routine drafting (§7.3) | ✅| routine draft uses  "claude-sonnet-4-6"                            |
+| Prompt caching (§7.3) | ✅ | Context block cache-controlled                                            |
+| Pluggable provider interface (§7.3) | ❌ | Hardcoded Anthropic client                                                |
 | Structured long-term store (§7.4) | ✅ | stakeholders, wins, posts, meetings, series, voice samples, user profiles |
-| Unstructured store / journal (§7.4) | ❌ | No journal table yet |
-| Hybrid retrieval / embedding search (§7.4) | ❌ | All context loaded on every turn; no retrieval layer |
-| Voice profile (§7.4) | ✅ | `voice_samples` table, rendered into context block |
+| Unstructured store / journal (§7.4) | ❌ | No journal table yet                                                      |
+| Hybrid retrieval / embedding search (§7.4) | ❌ | All context loaded on every turn; no retrieval layer                      |
+| Voice profile (§7.4) | ✅ | `voice_samples` table, rendered into context block                        |
 
 ---
 
