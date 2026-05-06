@@ -254,13 +254,15 @@ def _migrate_to_meeting_centric(conn: sqlite3.Connection) -> None:
 # ---- stakeholders ----
 
 def add_stakeholder(profile: dict) -> int:
+    defaults = {"role": None, "relationship": None, "communication_style": None, "what_they_reward": None, "notes": None}
+    row = {**defaults, **profile}
     with connect() as conn:
         cur = conn.execute(
             """INSERT INTO stakeholders
                  (name, role, relationship, communication_style, what_they_reward, notes, created_at, updated_at)
                VALUES
                  (:name, :role, :relationship, :communication_style, :what_they_reward, :notes, :now, :now)""",
-            {**profile, "now": _now()},
+            {**row, "now": _now()},
         )
         return cur.lastrowid
 
@@ -275,6 +277,24 @@ def get_stakeholder(name: str):
         return conn.execute(
             "SELECT * FROM stakeholders WHERE name = ?", (name,)
         ).fetchone()
+
+
+def update_stakeholder(name: str, **fields) -> None:
+    allowed = {"role", "relationship", "communication_style", "what_they_reward", "notes"}
+    sets: list = []
+    args: list = []
+    for k, v in fields.items():
+        if k not in allowed:
+            raise ValueError(f"unknown field: {k}")
+        sets.append(f"{k} = ?")
+        args.append(v)
+    if not sets:
+        return
+    sets.append("updated_at = ?")
+    args.append(_now())
+    args.append(name)
+    with connect() as conn:
+        conn.execute(f"UPDATE stakeholders SET {', '.join(sets)} WHERE name = ?", args)
 
 
 # ---- wins ----

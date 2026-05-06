@@ -2,7 +2,7 @@
 
 Tracks build state against the PRD. Update this when features land or scope shifts.
 
-Last updated: 2026-05-06 · Current branch: `feature/user-profiles` (open PR)
+Last updated: 2026-05-06 · Current branch: `feature/stakeholder-graph`
 
 ---
 
@@ -42,9 +42,9 @@ PRD goal: web chat UI + stakeholder graph + brag ledger + visibility drafting + 
 |---|---|
 | Per-person profiles (role, relationship, comm style, what they reward, notes) | ✅ |
 | Add / list / show (CLI) | ✅ |
-| Evolves over time (editable notes) | ⚠️ add only — no `stakeholder edit` command yet |
-| Formal org-chart structure (manager/skip/peer/influencer tiers) | ⚠️ relationship field captures this informally, no structured tier model |
-| Recent interactions / current sentiment tracking | ❌ no dedicated field; notes field is a workaround |
+| Evolves over time (editable notes) | ✅ `stakeholder edit` command |
+| Formal org-chart structure (manager/skip/peer/influencer tiers) | ✅ VALID_TIERS enforced at input; context block and list grouped by tier |
+| Recent interactions / current sentiment tracking | ✅ `stakeholder note` prepends dated entries to notes |
 
 ### §6.2 Visibility Drafting
 | Item | Status |
@@ -143,7 +143,6 @@ These weren't explicitly called out in the PRD but fell out naturally or were re
 
 ## Known Gaps / Tech Debt
 
-- **`stakeholder edit`** — no way to update a stakeholder record after creation; `notes` field is the only workaround.
 - **Task-scoped slicing** — §7.2 says send only the task-relevant slice (e.g. one stakeholder profile), not the full graph. Currently everything is sent on every turn. Fine at low data volume; will matter when the graph grows.
 - **Sonnet routing** — routine drafting (post, win log) could use Sonnet; deep coaching (debrief, prep, chat) warrants Opus. No routing yet.
 - **DB migration UX** — if a user has a pre-`user_profiles` DB and runs a coaching command, they get "Database not initialized" which is misleading. Should detect existing DB with missing table and suggest `make init`.

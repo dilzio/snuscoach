@@ -71,6 +71,8 @@ class TestCliDispatch:
             ["stakeholder", "add", "--help"],
             ["stakeholder", "list", "--help"],
             ["stakeholder", "show", "--help"],
+            ["stakeholder", "edit", "--help"],
+            ["stakeholder", "note", "--help"],
             ["win", "--help"],
             ["win", "add", "--help"],
             ["win", "list", "--help"],

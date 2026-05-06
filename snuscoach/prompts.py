@@ -1,3 +1,5 @@
+VALID_TIERS = ("manager", "skip", "peer", "cross-functional", "influencer", "direct-report", "other")
+
 _SYSTEM_TEMPLATE = """\
 You are Snuscoach, a personal AI coach for navigating corporate office politics.
 You coach {name} — {role_line}. {name} knows politics matters and wants to get better at it; they are not naturally inclined to play it.
@@ -60,21 +62,7 @@ def context_block(
     meeting_series: list,
     voice_samples: list | None = None,
 ) -> str:
-    parts = ["# STAKEHOLDERS"]
-    if stakeholders:
-        for s in stakeholders:
-            rel = s["relationship"] or "unknown relationship"
-            parts.append(f"\n## {s['name']} ({rel})")
-            for label, key in [
-                ("Role", "role"),
-                ("Communication style", "communication_style"),
-                ("What they reward", "what_they_reward"),
-                ("Notes", "notes"),
-            ]:
-                if s[key]:
-                    parts.append(f"{label}: {s[key]}")
-    else:
-        parts.append("(none recorded yet)")
+    parts = [_render_stakeholders_block(stakeholders)]
 
     parts.append("\n# WINS LEDGER (most recent first)")
     if wins:
@@ -161,6 +149,53 @@ def _render_meetings_block(meetings: list, meeting_series: list) -> str:
             parts.append(_render_meeting_entry(m))
 
     return "\n".join(parts)
+
+
+def _render_stakeholders_block(stakeholders: list) -> str:
+    parts = ["# STAKEHOLDERS"]
+    if not stakeholders:
+        parts.append("(none recorded yet)")
+        return "\n".join(parts)
+
+    by_tier: dict[str, list] = {t: [] for t in VALID_TIERS}
+    ungrouped: list = []
+    for s in stakeholders:
+        rel = (s["relationship"] or "").strip().lower()
+        if rel in by_tier:
+            by_tier[rel].append(s)
+        else:
+            ungrouped.append(s)
+
+    for tier in VALID_TIERS:
+        members = by_tier[tier]
+        if not members:
+            continue
+        parts.append(f"\n## {tier.title()}")
+        for s in members:
+            parts.append(_render_one_stakeholder(s, show_rel=False))
+
+    if ungrouped:
+        parts.append("\n## Unclassified")
+        for s in ungrouped:
+            parts.append(_render_one_stakeholder(s, show_rel=True))
+
+    return "\n".join(parts)
+
+
+def _render_one_stakeholder(s: dict, show_rel: bool) -> str:
+    header = f"\n### {s['name']}"
+    if show_rel and s["relationship"]:
+        header += f" ({s['relationship']})"
+    lines = [header]
+    for label, key in [
+        ("Role", "role"),
+        ("Communication style", "communication_style"),
+        ("What they reward", "what_they_reward"),
+        ("Notes", "notes"),
+    ]:
+        if s[key]:
+            lines.append(f"{label}: {s[key]}")
+    return "\n".join(lines)
 
 
 def _render_meeting_entry(m) -> str:

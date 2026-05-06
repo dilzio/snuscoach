@@ -14,7 +14,7 @@ try:
 except ImportError:
     pass
 
-from snuscoach import coach, db, logger
+from snuscoach import coach, db, logger, prompts
 
 
 # ---------------------------------------------------------------------------
@@ -109,10 +109,13 @@ def cmd_stakeholder_add(args):
         sys.exit(f"Stakeholder '{name}' already exists.")
     print(f"Name: {name}")
     role = input("Role/title: ").strip() or None
-    relationship = (
-        input("Relationship (manager/skip/peer/cross-functional/other): ").strip()
-        or None
-    )
+    while True:
+        relationship = (
+            input(f"Relationship ({'/'.join(prompts.VALID_TIERS)}): ").strip() or None
+        )
+        if relationship is None or relationship in prompts.VALID_TIERS:
+            break
+        print(f"Invalid tier. Must be one of: {', '.join(prompts.VALID_TIERS)}")
     communication_style = (
         input("Communication style (e.g. terse, data-driven, social): ").strip()
         or None
@@ -137,10 +140,26 @@ def cmd_stakeholder_list(_args):
     if not rows:
         print("No stakeholders yet. Run: snuscoach stakeholder add")
         return
+    by_tier: dict[str, list] = {t: [] for t in prompts.VALID_TIERS}
+    ungrouped = []
     for r in rows:
-        rel = r["relationship"] or "?"
-        role = r["role"] or "?"
-        print(f"  {r['name']} — {rel}, {role}")
+        rel = (r["relationship"] or "").strip().lower()
+        if rel in by_tier:
+            by_tier[rel].append(r)
+        else:
+            ungrouped.append(r)
+    for tier in prompts.VALID_TIERS:
+        members = by_tier[tier]
+        if not members:
+            continue
+        print(f"{tier}:")
+        for r in members:
+            print(f"  {r['name']} — {r['role'] or '?'}")
+    if ungrouped:
+        print("unclassified:")
+        for r in ungrouped:
+            rel = r["relationship"] or "?"
+            print(f"  {r['name']} — {rel}, {r['role'] or '?'}")
 
 
 def cmd_stakeholder_show(args):
@@ -157,6 +176,57 @@ def cmd_stakeholder_show(args):
     ]:
         if s[key]:
             print(f"{label}: {s[key]}")
+
+
+def cmd_stakeholder_edit(args):
+    name = (getattr(args, "name", None) or "").strip() or input("Name: ").strip()
+    if not name:
+        sys.exit("Name is required.")
+    s = db.get_stakeholder(name)
+    if not s:
+        sys.exit(f"No stakeholder named '{name}'.")
+    fields = [
+        ("1", "Role", "role"),
+        ("2", "Relationship", "relationship"),
+        ("3", "Communication style", "communication_style"),
+        ("4", "What they reward", "what_they_reward"),
+        ("5", "Notes", "notes"),
+    ]
+    print(f"Editing {name}:")
+    for num, label, key in fields:
+        print(f"  [{num}] {label}: {s[key] or '(empty)'}")
+    choice = input("Field to edit [1-5]: ").strip()
+    matched = {num: (label, key) for num, label, key in fields}.get(choice)
+    if not matched:
+        sys.exit(f"Invalid choice: {choice}")
+    label, key = matched
+    if key == "notes":
+        new = _input_multiline("Notes", initial=s["notes"] or "")
+        db.update_stakeholder(name, notes=new or None)
+    else:
+        new = input(f"{label} [{s[key] or ''}]: ").strip()
+        if key == "relationship" and new and new not in prompts.VALID_TIERS:
+            sys.exit(f"Invalid tier '{new}'. Must be one of: {', '.join(prompts.VALID_TIERS)}")
+        db.update_stakeholder(name, **{key: new or None})
+    print("Updated.")
+
+
+def cmd_stakeholder_note(args):
+    name = (getattr(args, "name", None) or "").strip() or input("Name: ").strip()
+    if not name:
+        sys.exit("Name is required.")
+    s = db.get_stakeholder(name)
+    if not s:
+        sys.exit(f"No stakeholder named '{name}'.")
+    obs = input("Observation: ").strip()
+    if not obs:
+        sys.exit("Observation is required.")
+    today = date.today().isoformat()
+    entry = f"[{today}] {obs}"
+    existing = s["notes"] or ""
+    new_notes = f"{entry}\n\n{existing}" if existing else entry
+    db.update_stakeholder(name, notes=new_notes)
+    print(f"Note added to {name}.")
 
 
 def cmd_win_add(_args):
@@ -889,6 +959,14 @@ def main():
     sk_show = sk.add_parser("show", help="Show one stakeholder profile")
     sk_show.add_argument("name")
     sk_show.set_defaults(func=cmd_stakeholder_show)
+
+    sk_edit = sk.add_parser("edit", help="Edit a stakeholder profile field")
+    sk_edit.add_argument("name", nargs="?", help="Stakeholder name (prompted if omitted)")
+    sk_edit.set_defaults(func=cmd_stakeholder_edit)
+
+    sk_note = sk.add_parser("note", help="Append a dated observation to a stakeholder's notes")
+    sk_note.add_argument("name", nargs="?", help="Stakeholder name (prompted if omitted)")
+    sk_note.set_defaults(func=cmd_stakeholder_note)
 
     # win
     win_parser = sub.add_parser("win", help="Manage the brag ledger / wins")
