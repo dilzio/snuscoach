@@ -6,7 +6,8 @@ from anthropic import Anthropic
 
 from snuscoach import db, logger, prompts
 
-MODEL = "claude-opus-4-7"
+OPUS_MODEL   = "claude-opus-4-7"
+SONNET_MODEL = "claude-sonnet-4-6"
 
 
 def _client() -> Anthropic:
@@ -38,20 +39,22 @@ def _system_blocks() -> list[dict]:
     ]
 
 
-def _stream(messages: list[dict]) -> str:
+def _stream(messages: list[dict], model: str) -> str:
     client = _client()
     system = _system_blocks()
     parts: list[str] = []
     started = time.monotonic()
     final_message = None
-    with client.messages.stream(
-        model=MODEL,
-        max_tokens=32000,
-        thinking={"type": "adaptive"},
-        output_config={"effort": "high"},
+    kwargs: dict = dict(
+        model=model,
+        max_tokens=32000 if model == OPUS_MODEL else 8096,
         system=system,
         messages=messages,
-    ) as stream:
+    )
+    if model == OPUS_MODEL:
+        kwargs["thinking"] = {"type": "adaptive"}
+        kwargs["output_config"] = {"effort": "high"}
+    with client.messages.stream(**kwargs) as stream:
         for text in stream.text_stream:
             print(text, end="", flush=True)
             parts.append(text)
@@ -68,14 +71,16 @@ def _stream(messages: list[dict]) -> str:
         response=response_text,
         usage=getattr(final_message, "usage", None),
         latency_ms=elapsed_ms,
-        model=MODEL,
+        model=model,
     )
     return response_text
 
 
-def one_shot(user_message: str) -> str:
-    return _stream([{"role": "user", "content": user_message}])
-
-
 def conversation(messages: list[dict]) -> str:
-    return _stream(messages)
+    """Coaching turns — Opus with extended thinking."""
+    return _stream(messages, OPUS_MODEL)
+
+
+def draft(messages: list[dict]) -> str:
+    """Drafting turns — Sonnet, no extended thinking."""
+    return _stream(messages, SONNET_MODEL)

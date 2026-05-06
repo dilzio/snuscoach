@@ -39,7 +39,7 @@ def test_post_draft_saves_last_iterated_draft(monkeypatch, temp_db):
     monkeypatch.setattr(cli, "_input_multiline", _multi)
 
     replies = iter(["FIRST draft", "SECOND refined draft"])
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
+    monkeypatch.setattr(cli.coach, "draft", lambda _msgs: next(replies))
 
     cli.cmd_post_draft(None)
 
@@ -83,7 +83,7 @@ def test_post_draft_iterated_seed_uses_last_reply(monkeypatch, temp_db):
     monkeypatch.setattr(cli, "_input_multiline", _multi)
 
     replies = iter(["FIRST", "SECOND", "THIRD final"])
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
+    monkeypatch.setattr(cli.coach, "draft", lambda _msgs: next(replies))
 
     cli.cmd_post_draft(None)
 
@@ -101,7 +101,7 @@ def test_post_draft_skips_save_when_user_declines_to_publish(monkeypatch, temp_d
         ],
     )
     monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "Work.")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "draft")
+    monkeypatch.setattr(cli.coach, "draft", lambda _msgs: "draft")
 
     cli.cmd_post_draft(None)
 
@@ -128,7 +128,7 @@ def test_post_draft_rejects_invalid_date(monkeypatch, temp_db):
         ],
     )
     monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "content")
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "draft")
+    monkeypatch.setattr(cli.coach, "draft", lambda _msgs: "draft")
 
     with pytest.raises(SystemExit):
         cli.cmd_post_draft(None)
@@ -147,7 +147,7 @@ def test_post_draft_rejects_empty_finalized_content(monkeypatch, temp_db):
     # work description first, then editor returns empty for finalize
     multi = iter(["Work description.", ""])
     monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: next(multi))
-    monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: "draft")
+    monkeypatch.setattr(cli.coach, "draft", lambda _msgs: "draft")
 
     cli.cmd_post_draft(None)
     assert db.list_posts() == []
