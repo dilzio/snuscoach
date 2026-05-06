@@ -122,6 +122,19 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             description TEXT,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name                 TEXT NOT NULL,
+            role                 TEXT,
+            org_context          TEXT,
+            political_strengths  TEXT,
+            political_weaknesses TEXT,
+            coaching_goals       TEXT,
+            communication_style  TEXT,
+            created_at           TEXT NOT NULL,
+            updated_at           TEXT NOT NULL
+        );
         """
     )
 
@@ -484,3 +497,49 @@ def delete_voice_sample(sample_id: int) -> bool:
     with connect() as conn:
         cur = conn.execute("DELETE FROM voice_samples WHERE id = ?", (sample_id,))
         return cur.rowcount > 0
+
+
+# ---- user profiles ----
+
+def add_user_profile(profile: dict) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            """INSERT INTO user_profiles
+                 (name, role, org_context, political_strengths, political_weaknesses,
+                  coaching_goals, communication_style, created_at, updated_at)
+               VALUES
+                 (:name, :role, :org_context, :political_strengths, :political_weaknesses,
+                  :coaching_goals, :communication_style, :now, :now)""",
+            {**profile, "now": _now()},
+        )
+        return cur.lastrowid
+
+
+def list_user_profiles() -> list:
+    with connect() as conn:
+        return list(
+            conn.execute(
+                "SELECT * FROM user_profiles ORDER BY created_at ASC, id ASC"
+            ).fetchall()
+        )
+
+
+def get_user_profile(profile_id: int):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM user_profiles WHERE id = ?", (profile_id,)
+        ).fetchone()
+
+
+def get_user_profile_by_name(name: str):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM user_profiles WHERE name = ?", (name,)
+        ).fetchone()
+
+
+def get_default_profile():
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM user_profiles ORDER BY created_at ASC, id ASC LIMIT 1"
+        ).fetchone()

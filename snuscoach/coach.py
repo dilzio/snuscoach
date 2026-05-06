@@ -19,6 +19,7 @@ def _client() -> Anthropic:
 
 
 def _system_blocks() -> list[dict]:
+    profile = dict(db.get_default_profile() or {})
     stakeholders = db.list_stakeholders()
     wins = db.list_wins()
     posts = db.list_posts()
@@ -26,7 +27,7 @@ def _system_blocks() -> list[dict]:
     meeting_series = db.list_meeting_series()
     voice_samples = db.list_voice_samples()
     return [
-        {"type": "text", "text": prompts.SYSTEM},
+        {"type": "text", "text": prompts.system_prompt(profile)},
         {
             "type": "text",
             "text": prompts.context_block(
