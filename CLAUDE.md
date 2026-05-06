@@ -2,6 +2,12 @@
 
 Working rules for the Snuscoach project. Honor these on every change. Matt will extend this file over time — read it before starting work.
 
+## Agent Invariants
+1. **Think Before Coding. Don't assume. Don't hide confusion. Surface tradeoffs.**
+2. **Simplicity First. Minimum code that solves the problem. Nothing speculative.**
+3. **Surgical Changes. Touch only what you must. Clean up only your own mess.** 
+4. **Goal-Driven Execution. Define success criteria. Loop until verified.**
+
 ## Workflow
 
 1. **Always cut a new branch from `main`** before starting feature work.
@@ -19,6 +25,9 @@ Working rules for the Snuscoach project. Honor these on every change. Matt will 
    - Commit at logical checkpoints — one feature or fix per commit; no batching unrelated changes.
    - Tests and the code they cover land in the same commit.
    - Do not push to a remote unless explicitly asked. Local commits only.
+
+4. **Always refer to PROGRESS.md when recommending/selecting the next feature to build**
+   - Always update PROGRESS.md on the feature branch when the work is completed
 
 ## Project context
 
