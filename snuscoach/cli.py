@@ -14,7 +14,7 @@ try:
 except ImportError:
     pass
 
-from snuscoach import coach, db, logger
+from snuscoach import coach, db, logger, prompts
 
 
 # ---------------------------------------------------------------------------
@@ -109,10 +109,13 @@ def cmd_stakeholder_add(args):
         sys.exit(f"Stakeholder '{name}' already exists.")
     print(f"Name: {name}")
     role = input("Role/title: ").strip() or None
-    relationship = (
-        input("Relationship (manager/skip/peer/cross-functional/other): ").strip()
-        or None
-    )
+    while True:
+        relationship = (
+            input(f"Relationship ({'/'.join(prompts.VALID_TIERS)}): ").strip() or None
+        )
+        if relationship is None or relationship in prompts.VALID_TIERS:
+            break
+        print(f"Invalid tier. Must be one of: {', '.join(prompts.VALID_TIERS)}")
     communication_style = (
         input("Communication style (e.g. terse, data-driven, social): ").strip()
         or None
@@ -137,10 +140,26 @@ def cmd_stakeholder_list(_args):
     if not rows:
         print("No stakeholders yet. Run: snuscoach stakeholder add")
         return
+    by_tier: dict[str, list] = {t: [] for t in prompts.VALID_TIERS}
+    ungrouped = []
     for r in rows:
-        rel = r["relationship"] or "?"
-        role = r["role"] or "?"
-        print(f"  {r['name']} — {rel}, {role}")
+        rel = (r["relationship"] or "").strip().lower()
+        if rel in by_tier:
+            by_tier[rel].append(r)
+        else:
+            ungrouped.append(r)
+    for tier in prompts.VALID_TIERS:
+        members = by_tier[tier]
+        if not members:
+            continue
+        print(f"{tier}:")
+        for r in members:
+            print(f"  {r['name']} — {r['role'] or '?'}")
+    if ungrouped:
+        print("unclassified:")
+        for r in ungrouped:
+            rel = r["relationship"] or "?"
+            print(f"  {r['name']} — {rel}, {r['role'] or '?'}")
 
 
 def cmd_stakeholder_show(args):
@@ -186,6 +205,8 @@ def cmd_stakeholder_edit(args):
         db.update_stakeholder(name, notes=new or None)
     else:
         new = input(f"{label} [{s[key] or ''}]: ").strip()
+        if key == "relationship" and new and new not in prompts.VALID_TIERS:
+            sys.exit(f"Invalid tier '{new}'. Must be one of: {', '.join(prompts.VALID_TIERS)}")
         db.update_stakeholder(name, **{key: new or None})
     print("Updated.")
 

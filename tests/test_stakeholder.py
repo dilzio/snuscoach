@@ -217,3 +217,58 @@ def test_note_confirms_output(monkeypatch, temp_db, capsys):
     _stub_inputs(monkeypatch, ["Good 1:1 today."])
     cli.cmd_stakeholder_note(_Args(name="Alice"))
     assert "Note added to Alice" in capsys.readouterr().out
+
+
+# ---- tier validation ----
+
+
+def test_add_rejects_invalid_tier_then_accepts_valid(monkeypatch, temp_db):
+    # "garbage" is rejected; "skip" is accepted; remaining prompts are empty
+    _stub_inputs(monkeypatch, ["Alice", "", "garbage", "skip", "", "", ""])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "")
+    cli.cmd_stakeholder_add(_Args())
+    assert db.get_stakeholder("Alice")["relationship"] == "skip"
+
+
+@pytest.mark.parametrize("tier", ["manager", "skip", "peer", "cross-functional", "influencer", "direct-report", "other"])
+def test_add_accepts_all_valid_tiers(monkeypatch, temp_db, tier):
+    _stub_inputs(monkeypatch, [tier + "_person", "", tier, "", "", ""])
+    monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "")
+    cli.cmd_stakeholder_add(_Args())
+    name = tier + "_person"
+    assert db.get_stakeholder(name)["relationship"] == tier
+
+
+def test_edit_relationship_invalid_tier_exits(monkeypatch, temp_db):
+    db.add_stakeholder({"name": "Alice", "relationship": "peer"})
+    _stub_inputs(monkeypatch, ["2", "bogus"])
+    with pytest.raises(SystemExit):
+        cli.cmd_stakeholder_edit(_Args(name="Alice"))
+    assert db.get_stakeholder("Alice")["relationship"] == "peer"
+
+
+def test_edit_relationship_empty_clears_to_none(monkeypatch, temp_db):
+    db.add_stakeholder({"name": "Alice", "relationship": "peer"})
+    _stub_inputs(monkeypatch, ["2", ""])
+    cli.cmd_stakeholder_edit(_Args(name="Alice"))
+    assert db.get_stakeholder("Alice")["relationship"] is None
+
+
+def test_list_groups_by_tier(monkeypatch, temp_db, capsys):
+    db.add_stakeholder({"name": "Alice", "relationship": "manager"})
+    db.add_stakeholder({"name": "Bob", "relationship": "peer"})
+    cli.cmd_stakeholder_list(None)
+    out = capsys.readouterr().out
+    assert "manager:" in out
+    assert "peer:" in out
+    assert out.index("manager:") < out.index("peer:")
+    assert "Alice" in out
+    assert "Bob" in out
+
+
+def test_list_unclassified_shows_raw_rel(monkeypatch, temp_db, capsys):
+    db.add_stakeholder({"name": "Alice", "relationship": "director"})
+    cli.cmd_stakeholder_list(None)
+    out = capsys.readouterr().out
+    assert "unclassified:" in out
+    assert "director" in out

@@ -43,7 +43,7 @@ PRD goal: web chat UI + stakeholder graph + brag ledger + visibility drafting + 
 | Per-person profiles (role, relationship, comm style, what they reward, notes) | ✅ |
 | Add / list / show (CLI) | ✅ |
 | Evolves over time (editable notes) | ✅ `stakeholder edit` command |
-| Formal org-chart structure (manager/skip/peer/influencer tiers) | ⚠️ relationship field captures this informally, no structured tier model |
+| Formal org-chart structure (manager/skip/peer/influencer tiers) | ✅ VALID_TIERS enforced at input; context block and list grouped by tier |
 | Recent interactions / current sentiment tracking | ✅ `stakeholder note` prepends dated entries to notes |
 
 ### §6.2 Visibility Drafting
