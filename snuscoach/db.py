@@ -142,6 +142,15 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             since_date TEXT,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS journal_entries (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            content      TEXT    NOT NULL,
+            coach_prompt TEXT,
+            entry_type   TEXT    NOT NULL DEFAULT 'journal',
+            created_at   TEXT    NOT NULL,
+            updated_at   TEXT    NOT NULL
+        );
         """
     )
 
@@ -597,4 +606,36 @@ def get_latest_reflection():
     with connect() as conn:
         return conn.execute(
             "SELECT * FROM reflections ORDER BY created_at DESC, id DESC LIMIT 1"
+        ).fetchone()
+
+
+# ---- journal entries ----
+
+def add_journal_entry(
+    content: str, coach_prompt: str | None = None, entry_type: str = "journal"
+) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            """INSERT INTO journal_entries
+                 (content, coach_prompt, entry_type, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (content, coach_prompt, entry_type, _now(), _now()),
+        )
+        return cur.lastrowid
+
+
+def list_journal_entries(limit: int = 10) -> list:
+    with connect() as conn:
+        return list(
+            conn.execute(
+                "SELECT * FROM journal_entries ORDER BY created_at DESC, id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        )
+
+
+def get_latest_journal_entry():
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM journal_entries ORDER BY created_at DESC, id DESC LIMIT 1"
         ).fetchone()

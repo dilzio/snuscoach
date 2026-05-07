@@ -27,6 +27,7 @@ def _system_blocks() -> list[dict]:
     meetings = db.list_meetings()
     meeting_series = db.list_meeting_series()
     voice_samples = db.list_voice_samples()
+    journal_entries = db.list_journal_entries(limit=7)
     latest_reflection = db.get_latest_reflection()
     return [
         {"type": "text", "text": prompts.system_prompt(profile)},
@@ -34,6 +35,7 @@ def _system_blocks() -> list[dict]:
             "type": "text",
             "text": prompts.context_block(
                 stakeholders, wins, posts, meetings, meeting_series, voice_samples,
+                journal_entries=journal_entries,
                 latest_reflection=latest_reflection,
             ),
             "cache_control": {"type": "ephemeral"},

@@ -26,6 +26,7 @@ def test_init_creates_all_tables(temp_db):
         "posts",
         "meeting_series",
         "meetings",
+        "journal_entries",
     } <= names
     # Old tables must be gone
     assert "prep_briefs" not in names
@@ -423,3 +424,102 @@ def test_get_reflections_orders_newest_first(temp_db):
     rows = db.get_reflections(limit=10)
     assert rows[0]["content"] == "Newest"
     assert rows[-1]["content"] == "Oldest"
+
+
+# ---- journal entries ----
+
+
+def test_journal_entries_table_exists(temp_db):
+    with db.connect() as conn:
+        names = {
+            r[0] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+    assert "journal_entries" in names
+
+
+def test_add_journal_entry_returns_id(temp_db):
+    jid = db.add_journal_entry("Alice was terse in the 1:1.")
+    assert jid > 0
+
+
+def test_journal_entry_defaults(temp_db):
+    db.add_journal_entry("Some notes.")
+    entry = db.get_latest_journal_entry()
+    assert entry["entry_type"] == "journal"
+    assert entry["coach_prompt"] is None
+
+
+def test_journal_entry_with_all_fields(temp_db):
+    db.add_journal_entry("My response.", coach_prompt="Coach questions.", entry_type="nudge")
+    entry = db.get_latest_journal_entry()
+    assert entry["content"] == "My response."
+    assert entry["coach_prompt"] == "Coach questions."
+    assert entry["entry_type"] == "nudge"
+
+
+def test_list_journal_entries_round_trip(temp_db):
+    db.add_journal_entry("Entry A.")
+    db.add_journal_entry("Entry B.")
+    db.add_journal_entry("Entry C.")
+    rows = db.list_journal_entries(limit=10)
+    assert len(rows) == 3
+    # Newest first
+    assert rows[0]["content"] == "Entry C."
+    assert rows[-1]["content"] == "Entry A."
+
+
+def test_list_journal_entries_respects_limit(temp_db):
+    for i in range(5):
+        db.add_journal_entry(f"Entry {i}.")
+    rows = db.list_journal_entries(limit=3)
+    assert len(rows) == 3
+
+
+def test_get_latest_journal_entry_returns_none_on_empty(temp_db):
+    assert db.get_latest_journal_entry() is None
+
+
+def test_get_latest_journal_entry_returns_most_recent(temp_db):
+    db.add_journal_entry("First.")
+    db.add_journal_entry("Second.")
+    latest = db.get_latest_journal_entry()
+    assert latest["content"] == "Second."
+
+
+def test_journal_entries_added_after_migration(temp_db_path, monkeypatch):
+    """journal_entries table is added when init_db is run on a DB that already
+    has the current schema minus journal_entries (simulates upgrading an existing DB)."""
+    import sqlite3
+
+    # Create a DB with current tables minus journal_entries
+    conn = sqlite3.connect(temp_db_path)
+    conn.executescript(
+        """
+        CREATE TABLE stakeholders (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+            role TEXT, relationship TEXT, communication_style TEXT, what_they_reward TEXT,
+            notes TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+        CREATE TABLE wins (id INTEGER PRIMARY KEY, title TEXT NOT NULL,
+            description TEXT, created_at TEXT NOT NULL);
+        CREATE TABLE reflections (id INTEGER PRIMARY KEY, content TEXT NOT NULL,
+            since_date TEXT, created_at TEXT NOT NULL);
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    # init_db should add journal_entries without error
+    db.init_db()
+
+    with db.connect() as c:
+        names = {
+            r[0] for r in c.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+    assert "journal_entries" in names
+
+    # Existing data untouched
+    jid = db.add_journal_entry("Post-migration entry.")
+    assert jid > 0

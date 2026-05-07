@@ -1,11 +1,12 @@
 import argparse
 import os
+import re
 import shlex
 import subprocess
 import sys
 import tempfile
 import textwrap
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 try:
     from dotenv import load_dotenv
@@ -910,6 +911,198 @@ def cmd_reflect(args):
 
 
 # ---------------------------------------------------------------------------
+# Journal
+# ---------------------------------------------------------------------------
+
+_DATE_ENTRY_RE = re.compile(r"\[(\d{4}-\d{2}-\d{2})\]")
+
+
+def _compute_nudge_gaps() -> dict:
+    """Pure Python gap analysis — no LLM call. Returns a plain-dict gaps summary."""
+    today = date.today()
+    cutoff_meetings = (today - timedelta(days=7)).isoformat()
+    cutoff_wins = (today - timedelta(days=14)).isoformat()
+    cutoff_stakeholders = (today - timedelta(days=30)).isoformat()
+
+    all_meetings = db.list_meetings(limit=50)
+    undebriefed = [
+        dict(m)
+        for m in all_meetings
+        if m["date"] >= cutoff_meetings and not m["debrief_summary"]
+    ]
+
+    all_wins = db.list_wins()
+    recent_wins = [w for w in all_wins if w["created_at"][:10] >= cutoff_wins]
+    wins_without_post = 0
+    if recent_wins:
+        all_posts = db.list_posts()
+        recent_posts = [p for p in all_posts if p["posted_at"] >= cutoff_wins]
+        if not recent_posts:
+            wins_without_post = len(recent_wins)
+
+    all_stakeholders = db.list_stakeholders()
+    silent = []
+    for s in all_stakeholders:
+        created_date = datetime.fromisoformat(s["created_at"]).date()
+        if (today - created_date).days < 30:
+            continue
+        dates = _DATE_ENTRY_RE.findall(s["notes"] or "")
+        if not dates or max(dates) < cutoff_stakeholders:
+            silent.append(dict(s))
+
+    latest = db.get_latest_journal_entry()
+    if latest:
+        last_date = datetime.fromisoformat(latest["created_at"]).date()
+        journal_gap_days = (today - last_date).days
+    else:
+        journal_gap_days = 999
+
+    return {
+        "undebriefed_meetings": undebriefed,
+        "wins_without_post": wins_without_post,
+        "silent_stakeholders": silent,
+        "journal_gap_days": journal_gap_days,
+    }
+
+
+def _format_transcript(messages: list[dict], skip_first: int = 1) -> str:
+    """Format a messages list as a labelled conversation transcript.
+
+    Skips the first `skip_first` messages (internal task prompts sent as
+    user role) so the saved content starts with the coach's opening.
+    """
+    parts = []
+    for m in messages[skip_first:]:
+        label = "coach" if m["role"] == "assistant" else "you"
+        parts.append(f"{label}: {m['content']}")
+    return "\n\n".join(parts)
+
+
+def cmd_journal(_args):
+    print("Daily journal check-in.\n")
+    opening_msg = prompts.journal_opening_prompt()
+    messages, _ = _iterate_with_followups(opening_msg, coach_fn=coach.draft)
+
+    # messages[0] = task prompt (user), messages[1] = coach opening (assistant),
+    # messages[2..] = alternating user/assistant turns
+    user_turns = [m["content"] for m in messages[2:] if m["role"] == "user"]
+    if not user_turns:
+        print("\nNothing to save.")
+        return
+
+    coach_opening = messages[1]["content"] if len(messages) > 1 else None
+
+    print()
+    answer = input("Save this journal entry? [Y/n]: ").strip().lower()
+    if answer in ("n", "no"):
+        print("Not saved.")
+        return
+
+    content = _format_transcript(messages, skip_first=1)
+    jid = db.add_journal_entry(content, coach_prompt=coach_opening, entry_type="journal")
+    print(f"Saved journal entry #{jid}.")
+
+
+def cmd_journals(_args):
+    rows = db.list_journal_entries(limit=20)
+    if not rows:
+        print("No journal entries yet. Run: snuscoach journal")
+        return
+    for r in rows:
+        first_line = (r["content"].splitlines()[0] if r["content"] else "")
+        snippet = first_line[:80] + ("…" if len(first_line) > 80 else "")
+        entry_type = r["entry_type"] or "journal"
+        print(f"  #{r['id']} [{r['created_at'][:10]} | {entry_type}] {snippet}")
+
+
+def cmd_nudge(_args):
+    mode = os.environ.get("SNUSCOACH_NUDGE_MODE", "interactive").strip().lower()
+    gaps = _compute_nudge_gaps()
+    if mode == "report":
+        _nudge_report(gaps)
+    else:
+        _nudge_interactive(gaps)
+
+
+def _nudge_interactive(gaps: dict) -> None:
+    print("Nudge: coach-initiated update check.\n")
+    nudge_prompt = prompts.nudge_analysis_prompt(gaps, mode="interactive")
+    messages, _ = _iterate_with_followups(nudge_prompt, coach_fn=coach.conversation)
+
+    print()
+    answer = input("Save this nudge session? [Y/n]: ").strip().lower()
+    if answer in ("n", "no"):
+        print("Not saved.")
+        return
+
+    content = _format_transcript(messages, skip_first=1) if len(messages) > 1 else "(no responses)"
+    db.add_journal_entry(content, coach_prompt=nudge_prompt, entry_type="nudge")
+    print("Nudge session saved.")
+
+
+def _nudge_report(gaps: dict) -> None:
+    # Build ordered action items for consistent numbering
+    items: list[tuple[str, str]] = []  # (description, make command)
+    for m in gaps["undebriefed_meetings"]:
+        items.append((
+            f"Meeting '{m['title']}' ({m['date']}) — no debrief logged",
+            f"make debrief id={m['id']}",
+        ))
+    if gaps["wins_without_post"] > 0:
+        items.append((
+            f"{gaps['wins_without_post']} win(s) this week — no visibility post",
+            "make post",
+        ))
+    for s in gaps["silent_stakeholders"][:5]:
+        items.append((
+            f"Stakeholder '{s['name']}' — no note in 30+ days",
+            f'snuscoach stakeholder note "{s["name"]}"',
+        ))
+    if gaps["journal_gap_days"] >= 2:
+        days_label = "never" if gaps["journal_gap_days"] >= 999 else f"{gaps['journal_gap_days']} days"
+        items.append((
+            f"No journal entry ({days_label})",
+            "make journal",
+        ))
+
+    if not items:
+        print("No gaps detected — you're on track across all dimensions.")
+        return
+
+    today = date.today().isoformat()
+    print(f"=== Nudge — {today} ===\n")
+
+    nudge_prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
+    messages = [{"role": "user", "content": nudge_prompt}]
+    print("coach> ", end="", flush=True)
+    coach.draft(messages)
+
+    print("\n--- Actions ---")
+    for i, (desc, cmd) in enumerate(items, start=1):
+        print(f"  [{i}] {cmd}")
+
+    print()
+    selection = input("Address which? (e.g. 1 2, or Enter to skip): ").strip()
+
+    chosen: list[int] = []
+    if selection:
+        for tok in selection.split():
+            try:
+                idx = int(tok)
+                if 1 <= idx <= len(items):
+                    chosen.append(idx - 1)
+            except ValueError:
+                pass
+        if chosen:
+            print("\nRun:")
+            for i in chosen:
+                print(f"  {items[i][1]}")
+
+    gap_summary = "\n".join(f"- {desc}" for desc, _ in items)
+    db.add_journal_entry(gap_summary, coach_prompt=nudge_prompt, entry_type="nudge")
+
+
+# ---------------------------------------------------------------------------
 # Startup profile check
 # ---------------------------------------------------------------------------
 
@@ -1093,6 +1286,20 @@ def main():
         help="Scope analysis to this date onwards (default: all history)",
     )
     reflect_p.set_defaults(func=cmd_reflect)
+
+    sub.add_parser(
+        "journal", help="Daily journal check-in (coach-prompted, saves to ledger)"
+    ).set_defaults(func=cmd_journal)
+
+    sub.add_parser(
+        "journals", help="List recent journal entries"
+    ).set_defaults(func=cmd_journals)
+
+    sub.add_parser(
+        "nudge",
+        help="Coach-initiated update check — detects gaps, asks about them "
+             "(mode: SNUSCOACH_NUDGE_MODE=interactive|report)",
+    ).set_defaults(func=cmd_nudge)
 
     args = parser.parse_args()
     logger.set_command(_command_path(args))
