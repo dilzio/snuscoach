@@ -2,7 +2,7 @@
 
 Tracks build state against the PRD. Update this when features land or scope shifts.
 
-Last updated: 2026-05-07 · Current branch: `feature/cross-pattern-surfacing`
+Last updated: 2026-05-07 · Current branch: `feature/journaling-and-nudge`
 
 ---
 
@@ -79,8 +79,8 @@ PRD goal: web chat UI + stakeholder graph + brag ledger + visibility drafting + 
 |---|---|
 | Manual interview-style intake — user profile | ✅ `profile create` |
 | Manual interview-style intake — stakeholder | ✅ `stakeholder add` |
-| System-initiated update prompts | ❌ |
-| Journaling / scheduled check-ins | ❌ |
+| System-initiated update prompts | ✅ `nudge` command — gap analysis + coach-initiated check-in (interactive: Opus multi-turn; report: Sonnet numbered list) |
+| Journaling / scheduled check-ins | ✅ `journal` command — coach-prompted daily check-in; `make schedule-install` manages crontab |
 | Document upload | ❌ Phase 2 |
 | No external integrations | ✅ design honored |
 
@@ -88,8 +88,8 @@ PRD goal: web chat UI + stakeholder graph + brag ledger + visibility drafting + 
 | Item | Status |
 |---|---|
 | Reactive coaching chat | ✅ |
-| Scheduled nudges (daily journaling, weekly brag review) | ❌ |
-| Coach-initiated update prompts | ❌ |
+| Scheduled nudges (daily journaling, weekly brag review) | ✅ `make schedule-install [time=HH:MM]` installs cron; `schedule-show` / `schedule-remove` manage it |
+| Coach-initiated update prompts | ✅ `make nudge` — gap analysis drives targeted questions; mode configurable via `SNUSCOACH_NUDGE_MODE` |
 
 ---
 
@@ -148,5 +148,5 @@ These weren't explicitly called out in the PRD but fell out naturally or were re
 - **Task-scoped slicing** — §7.2 says send only the task-relevant slice (e.g. one stakeholder profile), not the full graph. Currently everything is sent on every turn. Fine at low data volume; will matter when the graph grows.
 - **Sonnet routing** — routine drafting (post, win log) could use Sonnet; deep coaching (debrief, prep, chat) warrants Opus. No routing yet.
 - **DB migration UX** — if a user has a pre-`user_profiles` DB and runs a coaching command, they get "Database not initialized" which is misleading. Should detect existing DB with missing table and suggest `make init`.
-- **Journal** — §7.4 calls for unstructured journal entries + embedding search. No journal table, no retrieval layer. Low-impact for now (context window handles it); will matter as data grows.
+- **Journal** — `journal_entries` table now exists; last 7 entries injected into context block. Embedding search still not implemented — all context loaded on every turn (§7.4).
 - **Embedding / retrieval** — currently the full graph is dumped into context on every turn. Not scalable past a few hundred meetings/stakeholders.

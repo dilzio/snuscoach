@@ -1,4 +1,4 @@
-.PHONY: help install init profile-create profile-list profile-show chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean reflect
+.PHONY: help install init profile-create profile-list profile-show chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show stakeholder-note wins win-add voice-add voice-list voice-show backup-db test clean reflect journal journals nudge schedule-install schedule-show schedule-remove
 
 SNUSCOACH := .venv/bin/snuscoach
 
@@ -220,6 +220,34 @@ voice-list:  ## List voice samples
 voice-show:  ## Show one voice sample (required: id=N)
 	@if [ -z "$(id)" ]; then echo "Usage: make voice-show id=N"; exit 1; fi
 	$(SNUSCOACH) voice show $(id)
+
+stakeholder-note:  ## Append a dated observation to a stakeholder (required: name=NAME)
+	@if [ -z "$(name)" ]; then echo "Usage: make stakeholder-note name=NAME"; exit 1; fi
+	$(SNUSCOACH) stakeholder note "$(name)"
+
+journal:  ## Daily journal check-in (coach-prompted, saves entry to ledger)
+	$(SNUSCOACH) journal
+
+journals:  ## List recent journal entries
+	$(SNUSCOACH) journals
+
+nudge:  ## Coach-initiated update check — detects gaps, asks about them (SNUSCOACH_NUDGE_MODE=interactive|report)
+	$(SNUSCOACH) nudge
+
+schedule-install:  ## Install cron job for daily nudge (optional: time=HH:MM, default 09:00 Mon-Fri)
+	@TIME=$${time:-09:00}; \
+	HOUR=$$(echo $$TIME | cut -d: -f1); \
+	MIN=$$(echo $$TIME | cut -d: -f2); \
+	ENTRY="$$MIN $$HOUR * * 1-5 cd $(CURDIR) && $(CURDIR)/.venv/bin/snuscoach nudge >> $(HOME)/.snuscoach/nudge.log 2>&1"; \
+	(crontab -l 2>/dev/null | grep -v "snuscoach nudge"; echo "$$ENTRY") | crontab -; \
+	echo "Installed: $$ENTRY"
+
+schedule-show:  ## Show current snuscoach cron entries
+	@crontab -l 2>/dev/null | grep "snuscoach" || echo "(no snuscoach cron entries)"
+
+schedule-remove:  ## Remove snuscoach nudge cron job
+	@(crontab -l 2>/dev/null | grep -v "snuscoach nudge") | crontab - 2>/dev/null; \
+	echo "Removed snuscoach nudge cron entry."
 
 backup-db:  ## Snapshot the local DB to a timestamped backup file
 	@if [ ! -f "$$HOME/.snuscoach/snuscoach.db" ]; then \

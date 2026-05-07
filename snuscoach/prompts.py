@@ -62,6 +62,7 @@ def context_block(
     meetings: list,
     meeting_series: list,
     voice_samples: list | None = None,
+    journal_entries: list | None = None,
     latest_reflection=None,
 ) -> str:
     parts = [_render_stakeholders_block(stakeholders)]
@@ -75,6 +76,8 @@ def context_block(
             parts.append(line)
     else:
         parts.append("(none recorded yet)")
+
+    parts.append(_render_journal_block(journal_entries or []))
 
     parts.append(
         "\n# POST HISTORY (most recent first — use these for voice and to avoid repeating yourself)"
@@ -220,6 +223,89 @@ def _render_meeting_entry(m) -> str:
     if len(out) == 1:
         out.append("(no prep or debrief yet)")
     return "\n".join(out)
+
+
+def _render_journal_block(journal_entries: list) -> str:
+    parts = ["\n# JOURNAL (most recent first — daily check-ins and nudge sessions)"]
+    if not journal_entries:
+        parts.append("(none recorded yet)")
+        return "\n".join(parts)
+    for e in journal_entries[:7]:
+        label = e["entry_type"] or "journal"
+        date_str = e["created_at"][:10]
+        body = e["content"]
+        if len(body) > 400:
+            body = body[:400] + "…"
+        parts.append(f"\n[{date_str} | {label}] {body}")
+    return "\n".join(parts)
+
+
+def journal_opening_prompt() -> str:
+    """User message sent to Sonnet to generate opening journal check-in questions."""
+    return """\
+TASK: Generate opening questions for today's journal check-in.
+
+Look at the context you have (recent meetings, wins, stakeholders, journal history) and \
+generate 2–3 specific, direct opening questions for today's check-in.
+
+Focus on:
+- Any recent meetings that have no debrief logged yet (ask what came out of them)
+- Recent wins or work that hasn't generated a visibility post (is there a draft ready?)
+- Any stakeholders who've been quiet (any recent signals worth noting?)
+
+Reference actual names and events from the context — no generic prompts. \
+End with one clear question so the user knows exactly where to start."""
+
+
+def nudge_analysis_prompt(gaps: dict, mode: str = "interactive") -> str:
+    """User message for the nudge command. gaps keys: undebriefed_meetings,
+    wins_without_post, silent_stakeholders, journal_gap_days. mode: 'interactive' | 'report'."""
+    lines = []
+    if gaps.get("undebriefed_meetings"):
+        names = ", ".join(
+            f"'{m['title']}' ({m['date']})" for m in gaps["undebriefed_meetings"]
+        )
+        lines.append(
+            f"- {len(gaps['undebriefed_meetings'])} meeting(s) without a debrief: {names}"
+        )
+    if gaps.get("wins_without_post"):
+        lines.append(
+            f"- {gaps['wins_without_post']} win(s) logged in the last 14 days with no visibility post"
+        )
+    if gaps.get("silent_stakeholders"):
+        names = ", ".join(s["name"] for s in gaps["silent_stakeholders"])
+        lines.append(f"- Stakeholders with no recent note (30+ days): {names}")
+    journal_gap = gaps.get("journal_gap_days")
+    if journal_gap is not None and journal_gap >= 2:
+        days_label = "never" if journal_gap >= 999 else f"{journal_gap} days"
+        lines.append(f"- No journal entry in: {days_label}")
+
+    if not lines:
+        gap_summary = "No specific gaps detected — tracking well across all dimensions."
+    else:
+        gap_summary = "Detected gaps:\n" + "\n".join(lines)
+
+    if mode == "report":
+        return f"""\
+TASK: Nudge update check — structured gap report.
+
+{gap_summary}
+
+Produce a concise numbered list. For each item: one line stating what's missing, \
+one line stating the political risk of leaving it unaddressed. \
+If no gaps, confirm the user is on track and suggest one proactive move. \
+Keep it scannable — this is a report, not a coaching session."""
+    else:
+        return f"""\
+TASK: Nudge update check — coach-initiated check-in.
+
+{gap_summary}
+
+Start a direct coaching check-in. Ask about the flagged gaps specifically — \
+name the meeting, the stakeholder, the win. Don't ask generic questions. \
+If there are no gaps, run a brief proactive check: what's the political \
+temperature this week, any signals worth discussing? \
+End with a single concrete question so the user can respond."""
 
 
 def reflect_prompt(since_date: str | None = None) -> str:
