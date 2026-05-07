@@ -121,13 +121,8 @@ def test_gaps_journal_gap_days(temp_db):
 
 def test_nudge_interactive_saves_entry(monkeypatch, temp_db):
     monkeypatch.setenv("SNUSCOACH_NUDGE_MODE", "interactive")
-    captured = []
-
-    def _fake_conversation(msgs):
-        captured.append(msgs)
-        return "What came out of your 1:1?"
-
-    monkeypatch.setattr(cli.coach, "conversation", _fake_conversation)
+    turn = iter(["What came out of your 1:1?", "Interesting — tell me more."])
+    monkeypatch.setattr(cli.coach, "conversation", lambda _: next(turn))
     _stub_inputs(monkeypatch, ["Alice seemed worried.", "", "y"])
 
     cli.cmd_nudge(_Args())
@@ -135,7 +130,11 @@ def test_nudge_interactive_saves_entry(monkeypatch, temp_db):
     entry = db.get_latest_journal_entry()
     assert entry is not None
     assert entry["entry_type"] == "nudge"
-    assert "Alice seemed worried." in entry["content"]
+    # Both parties labelled in transcript
+    assert "coach: What came out of your 1:1?" in entry["content"]
+    assert "you: Alice seemed worried." in entry["content"]
+    # Internal task prompt excluded
+    assert "TASK:" not in entry["content"]
 
 
 def test_nudge_interactive_skips_save_when_declined(monkeypatch, temp_db):

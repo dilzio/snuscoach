@@ -36,16 +36,23 @@ def test_journal_saves_entry(monkeypatch, temp_db):
     assert rows[0]["coach_prompt"] == "What came out of your 1:1 this week?"
 
 
-def test_journal_multi_turn_joins_user_responses(monkeypatch, temp_db):
-    turn = iter(["Q1", "Q2", "Q3"])
+def test_journal_transcript_includes_both_parties(monkeypatch, temp_db):
+    turn = iter(["Opening questions.", "Coach follow-up.", "Coach wrap-up."])
     monkeypatch.setattr(cli.coach, "draft", lambda _: next(turn))
     _stub_inputs(monkeypatch, ["First response.", "Second response.", "", "y"])
 
     cli.cmd_journal(_Args())
 
     entry = db.get_latest_journal_entry()
-    assert "First response." in entry["content"]
-    assert "Second response." in entry["content"]
+    content = entry["content"]
+    # User turns are labelled
+    assert "you: First response." in content
+    assert "you: Second response." in content
+    # Coach turns are labelled
+    assert "coach: Opening questions." in content
+    assert "coach: Coach follow-up." in content
+    # Internal task prompt is excluded
+    assert "TASK:" not in content
 
 
 def test_journal_skips_save_when_declined(monkeypatch, temp_db):

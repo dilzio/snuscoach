@@ -965,12 +965,25 @@ def _compute_nudge_gaps() -> dict:
     }
 
 
+def _format_transcript(messages: list[dict], skip_first: int = 1) -> str:
+    """Format a messages list as a labelled conversation transcript.
+
+    Skips the first `skip_first` messages (internal task prompts sent as
+    user role) so the saved content starts with the coach's opening.
+    """
+    parts = []
+    for m in messages[skip_first:]:
+        label = "coach" if m["role"] == "assistant" else "you"
+        parts.append(f"{label}: {m['content']}")
+    return "\n\n".join(parts)
+
+
 def cmd_journal(_args):
     print("Daily journal check-in.\n")
     opening_msg = prompts.journal_opening_prompt()
     messages, _ = _iterate_with_followups(opening_msg, coach_fn=coach.draft)
 
-    # messages[0] = task prompt (user), messages[1] = opening questions (assistant),
+    # messages[0] = task prompt (user), messages[1] = coach opening (assistant),
     # messages[2..] = alternating user/assistant turns
     user_turns = [m["content"] for m in messages[2:] if m["role"] == "user"]
     if not user_turns:
@@ -985,7 +998,7 @@ def cmd_journal(_args):
         print("Not saved.")
         return
 
-    content = "\n\n".join(user_turns)
+    content = _format_transcript(messages, skip_first=1)
     jid = db.add_journal_entry(content, coach_prompt=coach_opening, entry_type="journal")
     print(f"Saved journal entry #{jid}.")
 
@@ -1016,15 +1029,13 @@ def _nudge_interactive(gaps: dict) -> None:
     nudge_prompt = prompts.nudge_analysis_prompt(gaps, mode="interactive")
     messages, _ = _iterate_with_followups(nudge_prompt, coach_fn=coach.conversation)
 
-    user_turns = [m["content"] for m in messages[1:] if m["role"] == "user"]
-
     print()
     answer = input("Save this nudge session? [Y/n]: ").strip().lower()
     if answer in ("n", "no"):
         print("Not saved.")
         return
 
-    content = "\n\n".join(user_turns) if user_turns else "(no responses)"
+    content = _format_transcript(messages, skip_first=1) if len(messages) > 1 else "(no responses)"
     db.add_journal_entry(content, coach_prompt=nudge_prompt, entry_type="nudge")
     print("Nudge session saved.")
 
