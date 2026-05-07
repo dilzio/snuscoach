@@ -1,4 +1,4 @@
-.PHONY: help install init profile-create profile-list profile-show chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean
+.PHONY: help install init profile-create profile-list profile-show chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show wins win-add voice-add voice-list voice-show backup-db test clean reflect
 
 SNUSCOACH := .venv/bin/snuscoach
 
@@ -228,6 +228,9 @@ backup-db:  ## Snapshot the local DB to a timestamped backup file
 	fi
 	cp "$$HOME/.snuscoach/snuscoach.db" "$$HOME/.snuscoach/snuscoach.db.backup-$$(date +%Y%m%d-%H%M%S)"
 	@echo "Backed up to ~/.snuscoach/snuscoach.db.backup-$$(date +%Y%m%d-%H%M%S)"
+
+reflect:  ## Generate a cross-session political pattern reflection (optional: since=YYYY-MM-DD)
+	$(SNUSCOACH) reflect $(if $(since),--since $(since),)
 
 test:  ## Run the integration test suite
 	.venv/bin/pytest

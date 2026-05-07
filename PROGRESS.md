@@ -2,7 +2,7 @@
 
 Tracks build state against the PRD. Update this when features land or scope shifts.
 
-Last updated: 2026-05-06 · Current branch: `feature/stakeholder-graph`
+Last updated: 2026-05-07 · Current branch: `feature/cross-pattern-surfacing`
 
 ---
 
@@ -70,7 +70,9 @@ PRD goal: web chat UI + stakeholder graph + brag ledger + visibility drafting + 
 | Open chat with full context loaded | ✅ `make chat` |
 | Framework-grounded analysis (Cialdini, Crucial Conversations, etc.) | ✅ in system prompt |
 | Pushes back on naive reads | ✅ in system prompt |
-| Cross-session pattern surfacing ("third time this quarter…") | ⚠️ coach can do this from meeting history in context; not explicitly prompted |
+| Cross-session pattern surfacing — passive (coach calls out patterns in all flows) | ✅ explicit directive in system prompt; series meeting counts surface recurrence |
+| Cross-session pattern surfacing — active (`make reflect [since=DATE]`) | ✅ structured brief: avoidances, stalled relationships, visibility gaps, working well |
+| Reflections persisted + fed back into context (latest reflection in context block) | ✅ `reflections` table; latest reflection injected cache-controlled |
 
 ### §6.5 Context Ingestion
 | Item | Status |
@@ -115,7 +117,7 @@ These weren't explicitly called out in the PRD but fell out naturally or were re
 | Claude Sonnet for routine drafting (§7.3) | ✅| routine draft uses  "claude-sonnet-4-6"                            |
 | Prompt caching (§7.3) | ✅ | Context block cache-controlled                                            |
 | Pluggable provider interface (§7.3) | ❌ | Hardcoded Anthropic client                                                |
-| Structured long-term store (§7.4) | ✅ | stakeholders, wins, posts, meetings, series, voice samples, user profiles |
+| Structured long-term store (§7.4) | ✅ | stakeholders, wins, posts, meetings, series, voice samples, user profiles, reflections |
 | Unstructured store / journal (§7.4) | ❌ | No journal table yet                                                      |
 | Hybrid retrieval / embedding search (§7.4) | ❌ | All context loaded on every turn; no retrieval layer                      |
 | Voice profile (§7.4) | ✅ | `voice_samples` table, rendered into context block                        |

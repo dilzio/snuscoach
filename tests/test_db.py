@@ -359,3 +359,67 @@ def test_migration_from_old_schema(temp_db_path, monkeypatch):
         p for p in temp_db_path.parent.iterdir() if p.name.startswith(temp_db_path.name + ".backup-")
     ]
     assert len(backups) == 1
+
+
+# ---- reflections ----
+
+
+def test_reflections_table_exists(temp_db):
+    with db.connect() as conn:
+        names = {
+            r[0] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+    assert "reflections" in names
+
+
+def test_save_reflection_returns_id(temp_db):
+    rid = db.save_reflection("Pattern brief content.")
+    assert rid > 0
+
+
+def test_get_latest_reflection_returns_most_recent(temp_db):
+    db.save_reflection("First reflection")
+    db.save_reflection("Second reflection")
+    latest = db.get_latest_reflection()
+    assert latest["content"] == "Second reflection"
+
+
+def test_get_latest_reflection_returns_none_when_empty(temp_db):
+    assert db.get_latest_reflection() is None
+
+
+def test_save_reflection_stores_since_date(temp_db):
+    db.save_reflection("Windowed brief", since_date="2026-04-01")
+    r = db.get_latest_reflection()
+    assert r["since_date"] == "2026-04-01"
+
+
+def test_save_reflection_since_date_optional(temp_db):
+    db.save_reflection("Full-history brief")
+    r = db.get_latest_reflection()
+    assert r["since_date"] is None
+
+
+def test_get_reflections_returns_all(temp_db):
+    db.save_reflection("A")
+    db.save_reflection("B")
+    db.save_reflection("C")
+    rows = db.get_reflections(limit=10)
+    assert len(rows) == 3
+
+
+def test_get_reflections_respects_limit(temp_db):
+    for i in range(5):
+        db.save_reflection(f"Reflection {i}")
+    rows = db.get_reflections(limit=2)
+    assert len(rows) == 2
+
+
+def test_get_reflections_orders_newest_first(temp_db):
+    db.save_reflection("Oldest")
+    db.save_reflection("Newest")
+    rows = db.get_reflections(limit=10)
+    assert rows[0]["content"] == "Newest"
+    assert rows[-1]["content"] == "Oldest"
