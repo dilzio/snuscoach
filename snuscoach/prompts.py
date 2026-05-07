@@ -12,6 +12,7 @@ CORE BEHAVIORS
 2. Push toward action. A session that doesn't end with a concrete next step (a post to publish, a person to talk to, a question to ask, a behavior to try) is worse than nothing. Always close with a "next move."
 3. Stay grounded. You only know what's been shared with you. When you need information about the org, the work, or a stakeholder you don't have on file, ASK — don't fabricate.
 4. Authentic influence, not manipulation. Coaching biases toward credibility, alignment, reciprocity, and clear communication. If {name} asks for a tactic that's zero-sum or damages a colleague, name the tradeoff and offer a higher-integrity alternative.
+5. Surface patterns proactively. When the meeting history shows a recurring behavior — repeated avoidance of a hard conversation, missed escalation windows, credit gaps, stalled stakeholder relationships — name it explicitly and cite the evidence ("third time this series you've left without a follow-up committed"). Don't wait to be asked. If a LATEST REFLECTION is present below, treat it as a standing political health check: call out when the current situation maps to a flagged pattern.
 
 OUTPUT STYLE
 
@@ -61,6 +62,7 @@ def context_block(
     meetings: list,
     meeting_series: list,
     voice_samples: list | None = None,
+    latest_reflection=None,
 ) -> str:
     parts = [_render_stakeholders_block(stakeholders)]
 
@@ -90,6 +92,11 @@ def context_block(
     parts.append(_render_voice_block(voice_samples or []))
 
     parts.append(_render_meetings_block(meetings, meeting_series))
+
+    if latest_reflection:
+        window = f" (since {latest_reflection['since_date']})" if latest_reflection["since_date"] else ""
+        parts.append(f"\n# LATEST REFLECTION{window} [{latest_reflection['created_at'][:10]}]")
+        parts.append(latest_reflection["content"])
 
     return "\n".join(parts)
 
@@ -138,8 +145,9 @@ def _render_meetings_block(meetings: list, meeting_series: list) -> str:
         series = series_by_id.get(sid)
         if not series:
             continue
+        count = len(by_series[sid])
         desc = f" — {series['description']}" if series["description"] else ""
-        parts.append(f"\n## SERIES: {series['name']}{desc}")
+        parts.append(f"\n## SERIES: {series['name']}{desc} ({count} meeting{'s' if count != 1 else ''})")
         for m in by_series[sid][:15]:
             parts.append(_render_meeting_entry(m))
 
@@ -212,3 +220,34 @@ def _render_meeting_entry(m) -> str:
     if len(out) == 1:
         out.append("(no prep or debrief yet)")
     return "\n".join(out)
+
+
+def reflect_prompt(since_date: str | None = None) -> str:
+    """User message for the reflect command — requests a structured pattern brief."""
+    window = f"Analysis window: {since_date} to today." if since_date else "Analysis window: all recorded history."
+    return f"""\
+TASK: Political Pattern Reflection Brief.
+
+{window}
+
+Produce a structured brief with exactly these four sections. Keep each item terse: \
+one line citing the evidence (meeting series / stakeholder / win title / date), \
+one line stating the implication. If a section has nothing to report, write "(none identified)".
+
+## Recurring avoidances
+Behaviors appearing repeatedly across sessions: avoiding hard conversations, \
+missing escalation windows, not giving or seeking credit, repeatedly failing to follow up.
+
+## Stalled relationships
+Stakeholders where notes and meeting history show no recent positive signal — \
+no alignment, no recognition, no meaningful exchange. Note when the relationship \
+last showed positive movement.
+
+## Visibility gaps
+Wins logged in the ledger with no corresponding visibility post, or meaningful \
+drops in posting frequency.
+
+## Working well
+Behaviors the history shows executing consistently: pre-alignment habits, \
+follow-through on commitments, credit practices, good debrief discipline. \
+Be specific and cite evidence."""

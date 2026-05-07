@@ -135,6 +135,13 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             created_at           TEXT NOT NULL,
             updated_at           TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS reflections (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            content    TEXT NOT NULL,
+            since_date TEXT,
+            created_at TEXT NOT NULL
+        );
         """
     )
 
@@ -562,4 +569,32 @@ def get_default_profile():
     with connect() as conn:
         return conn.execute(
             "SELECT * FROM user_profiles ORDER BY created_at ASC, id ASC LIMIT 1"
+        ).fetchone()
+
+
+# ---- reflections ----
+
+def save_reflection(content: str, since_date: str | None = None) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO reflections (content, since_date, created_at) VALUES (?, ?, ?)",
+            (content, since_date, _now()),
+        )
+        return cur.lastrowid
+
+
+def get_reflections(limit: int = 10) -> list:
+    with connect() as conn:
+        return list(
+            conn.execute(
+                "SELECT * FROM reflections ORDER BY created_at DESC, id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        )
+
+
+def get_latest_reflection():
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM reflections ORDER BY created_at DESC, id DESC LIMIT 1"
         ).fetchone()

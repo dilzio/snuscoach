@@ -882,6 +882,34 @@ def cmd_chat(_args):
 
 
 # ---------------------------------------------------------------------------
+# Reflect
+# ---------------------------------------------------------------------------
+
+
+def cmd_reflect(args):
+    since_date = getattr(args, "since", None)
+    if since_date:
+        since_date = _parse_date(since_date)
+
+    window_label = f"since {since_date}" if since_date else "all history"
+    print(f"Generating political pattern reflection ({window_label})...\n")
+
+    user_msg = prompts.reflect_prompt(since_date)
+    messages = [{"role": "user", "content": user_msg}]
+    print("coach> ", end="", flush=True)
+    brief = coach.conversation(messages)
+
+    print()
+    answer = input("Save this reflection? [Y/n]: ").strip().lower()
+    if answer in ("n", "no"):
+        print("Not saved.")
+        return
+
+    rid = db.save_reflection(brief, since_date)
+    print(f"Saved reflection #{rid}.")
+
+
+# ---------------------------------------------------------------------------
 # Startup profile check
 # ---------------------------------------------------------------------------
 
@@ -1054,6 +1082,17 @@ def main():
     debrief_alias.set_defaults(func=cmd_meeting_debrief)
 
     sub.add_parser("chat", help="Open coaching chat").set_defaults(func=cmd_chat)
+
+    reflect_p = sub.add_parser(
+        "reflect", help="Generate a cross-session political pattern brief"
+    )
+    reflect_p.add_argument(
+        "--since",
+        metavar="YYYY-MM-DD",
+        default=None,
+        help="Scope analysis to this date onwards (default: all history)",
+    )
+    reflect_p.set_defaults(func=cmd_reflect)
 
     args = parser.parse_args()
     logger.set_command(_command_path(args))
