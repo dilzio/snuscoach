@@ -73,6 +73,30 @@ def test_chat_panel_accepts_input(page: Page, ui_base_url: str) -> None:
     expect(page.locator("text=Hello coach").first).to_be_visible()
 
 
+def test_all_three_card_headings_simultaneously_visible(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """All three sidebar card headings must be in-viewport even with a long nudge."""
+    today = date.today().isoformat()
+    long_nudge = ("This is a very long nudge paragraph. " * 40).strip()
+
+    conn = sqlite3.connect(str(ui_db_path))
+    conn.execute(
+        "INSERT INTO nudges (date, report, gaps_json, created_at) VALUES (?, ?, ?, ?)",
+        (today, long_nudge, "{}", today + "T00:00:00"),
+    )
+    conn.commit()
+    conn.close()
+
+    _goto(page, f"{ui_base_url}{HOME}")
+    page.wait_for_selector(".q-spinner", state="hidden", timeout=20_000)
+
+    for heading in ("Coach nudge", "Upcoming meetings", "Wins without a post"):
+        assert page.locator(f"text={heading}").first.is_visible(), (
+            f'"{heading}" heading is not visible in the viewport'
+        )
+
+
 def test_nudge_card_serves_cached_report(page: Page, ui_base_url: str, ui_db_path: Path) -> None:
     """Nudge card shows cached report without making an LLM call."""
     today = date.today().isoformat()

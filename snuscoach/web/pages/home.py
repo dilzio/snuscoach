@@ -11,9 +11,13 @@ from snuscoach.web.components.nav import create_nav
 
 
 def _nudge_card(panel_ref: list) -> None:
-    with ui.card().classes("w-full"):
+    with ui.card().classes("w-full").style(
+        "max-height: 45vh; display: flex; flex-direction: column"
+    ):
         ui.label("Coach nudge").classes("text-subtitle2 text-bold")
-        content_col = ui.column().classes("w-full")
+        content_col = ui.column().classes("w-full").style(
+            "overflow-y: auto; flex: 1; min-height: 0"
+        )
         with content_col:
             spinner = ui.spinner("dots")
 
@@ -104,7 +108,7 @@ def home_page() -> None:
         "height: calc(100vh - 56px); overflow: hidden"
     ):
         with ui.column().classes("q-pa-md gap-4").style(
-            "width: 360px; overflow-y: auto; flex-shrink: 0"
+            "width: 360px; height: 100%; overflow-y: auto; flex-shrink: 0"
         ):
             _nudge_card(panel)
             _upcoming_meetings_card()
