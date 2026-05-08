@@ -21,6 +21,7 @@ Working rules for the Snuscoach project. Honor these on every change. Matt will 
    - Goal is regression prevention — exercise the full path (CLI → DB → output, coach context assembly with seeded DB rows, etc.) rather than mocking heavily.
    - When fixing a bug, write the test that reproduces it first, then fix.
    - When changing existing code that lacks coverage, add coverage for the path you're touching.
+   - Write Playwright tests for all features
 
 3. **Always commit locally after writing code.**
    - Commit at logical checkpoints — one feature or fix per commit; no batching unrelated changes.
@@ -32,7 +33,9 @@ Working rules for the Snuscoach project. Honor these on every change. Matt will 
 
 ## Project context
 
-- Product spec: `PRD.md` — read this before suggesting architectural changes. Phasing and non-goals are already locked.
+- Product spec: `docs/PRD.md` — read this before suggesting architectural changes. Phasing and non-goals are already locked.
+- UI spec: `docs/UI_DESIGN.md` — read this before suggesting architectural changes. Phasing and non-goals are already locked.
+- Progress File: `docs/PROGRESS.md` — read this before planning features.
 - Phase 0 spike is built (CLI + SQLite + Anthropic SDK with prompt caching). The existing baseline is untested; when you touch a path that lacks coverage, add it.
 - `make` (no target) lists every CLI command.
 
