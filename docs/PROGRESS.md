@@ -97,7 +97,7 @@ Design doc: [`docs/UI_DESIGN.md`](UI_DESIGN.md)
 
 | Item | Status | Notes |
 |---|---|---|
-| Foundation: NiceGUI install, module layout, left nav, page routing, `make ui` | ❌ | |
+| Foundation: NiceGUI install, module layout, left nav, page routing, `make ui` | ✅ | `feature/ui-foundation`; Playwright test suite in `tests/ui/` |
 | Home dashboard: open chat + nudge card + upcoming meetings card + wins-gap card | ❌ | |
 | Meetings section: meeting list + series + detail view + prep/debrief chat | ❌ | |
 | Stakeholders section: list by tier + detail view + add/edit + contextual chat | ❌ | |
