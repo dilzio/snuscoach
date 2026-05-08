@@ -63,7 +63,7 @@ def ui_server(tmp_path_factory):
         print(f"\nServer log:\n{log_path.read_text()}")
         raise
 
-    yield base_url
+    yield base_url, db_path
 
     proc.terminate()
     proc.wait(timeout=5)
@@ -72,4 +72,9 @@ def ui_server(tmp_path_factory):
 
 @pytest.fixture
 def ui_base_url(ui_server):
-    return ui_server
+    return ui_server[0]
+
+
+@pytest.fixture
+def ui_db_path(ui_server):
+    return ui_server[1]

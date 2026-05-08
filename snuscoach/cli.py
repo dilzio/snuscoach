@@ -1077,7 +1077,10 @@ def _nudge_report(gaps: dict) -> None:
     messages = [{"role": "user", "content": nudge_prompt}]
     print("coach> ", end="", flush=True)
     report = coach.draft(messages)
-    db.add_nudge(today, report, json.dumps(gaps))
+    try:
+        db.add_nudge(today, report, json.dumps(gaps))
+    except Exception:
+        print("\n[Warning: nudge could not be cached — run `make init` if you haven't yet]", file=sys.stderr)
 
     print("\n--- Actions ---")
     for i, (desc, cmd) in enumerate(items, start=1):

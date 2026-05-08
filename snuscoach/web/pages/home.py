@@ -20,23 +20,30 @@ def _nudge_card(panel_ref: list) -> None:
     async def _load() -> None:
         today = date.today().isoformat()
         report: str | None = None
+        gaps: dict | None = None
 
         # Cache hit: serve stored report, no LLM call
         cached = db.get_nudge_for_date(today)
         if cached:
             report = cached["report"]
         else:
-            # Cache miss: call LLM and persist for the rest of the day
+            # Cache miss: LLM call in its own try/except so a DB save failure
+            # afterwards does not overwrite a successfully-generated report.
             try:
                 gaps = _compute_nudge_gaps()
                 prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 report = await loop.run_in_executor(
                     None, coach.draft, [{"role": "user", "content": prompt}]
                 )
-                db.add_nudge(today, report, json.dumps(gaps))
             except Exception:
                 report = None
+
+            if report is not None and gaps is not None:
+                try:
+                    db.add_nudge(today, report, json.dumps(gaps))
+                except Exception:
+                    pass  # caching failed; nudge still displays from in-memory report
 
         spinner.delete()
         with content_col:

@@ -5,6 +5,11 @@ functional. AI calls are expected to fail (fake API key in conftest) so the
 nudge card's error fallback is what we assert against.
 """
 
+import os
+import sqlite3
+from datetime import date
+from pathlib import Path
+
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -66,3 +71,22 @@ def test_chat_panel_accepts_input(page: Page, ui_base_url: str) -> None:
     chat_input.fill("Hello coach")
     page.locator("button:has-text('Send')").first.click()
     expect(page.locator("text=Hello coach").first).to_be_visible()
+
+
+def test_nudge_card_serves_cached_report(page: Page, ui_base_url: str, ui_db_path: Path) -> None:
+    """Nudge card shows cached report without making an LLM call."""
+    today = date.today().isoformat()
+    cached_text = "Cached nudge report: you are doing great."
+
+    # Seed today's nudge directly into the test DB
+    conn = sqlite3.connect(str(ui_db_path))
+    conn.execute(
+        "INSERT INTO nudges (date, report, gaps_json, created_at) VALUES (?, ?, ?, ?)",
+        (today, cached_text, "{}", today + "T00:00:00"),
+    )
+    conn.commit()
+    conn.close()
+
+    _goto(page, f"{ui_base_url}{HOME}")
+    page.wait_for_selector(".q-spinner", state="hidden", timeout=20_000)
+    expect(page.locator(f"text={cached_text}").first).to_be_visible()

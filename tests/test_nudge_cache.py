@@ -98,3 +98,23 @@ def test_nudge_report_no_gaps_does_not_save(temp_db, capsys):
 
     today = __import__("datetime").date.today().isoformat()
     assert db.get_nudge_for_date(today) is None
+
+
+def test_nudge_report_db_failure_does_not_raise(temp_db, capsys):
+    """If db.add_nudge raises, _nudge_report() should not propagate the exception."""
+    gaps = {
+        "undebriefed_meetings": [{"id": 1, "title": "1:1", "date": "2026-05-01"}],
+        "wins_without_post": 0,
+        "silent_stakeholders": [],
+        "journal_gap_days": 999,
+    }
+
+    with patch("snuscoach.coach.draft", return_value="Mock nudge report"), \
+         patch("snuscoach.db.add_nudge", side_effect=Exception("DB exploded")), \
+         patch("builtins.input", return_value=""):
+        # Should not raise despite DB failure
+        _nudge_report(gaps)
+
+    # Warning should appear on stderr
+    captured = capsys.readouterr()
+    assert "make init" in captured.err
