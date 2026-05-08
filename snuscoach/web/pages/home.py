@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import date
 
 from nicegui import ui
@@ -17,15 +18,26 @@ def _nudge_card(panel_ref: list) -> None:
             spinner = ui.spinner("dots")
 
     async def _load() -> None:
-        try:
-            gaps = _compute_nudge_gaps()
-            prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
-            loop = asyncio.get_event_loop()
-            report = await loop.run_in_executor(
-                None, coach.draft, [{"role": "user", "content": prompt}]
-            )
-        except Exception:
-            report = None
+        today = date.today().isoformat()
+        report: str | None = None
+
+        # Cache hit: serve stored report, no LLM call
+        cached = db.get_nudge_for_date(today)
+        if cached:
+            report = cached["report"]
+        else:
+            # Cache miss: call LLM and persist for the rest of the day
+            try:
+                gaps = _compute_nudge_gaps()
+                prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
+                loop = asyncio.get_event_loop()
+                report = await loop.run_in_executor(
+                    None, coach.draft, [{"role": "user", "content": prompt}]
+                )
+                db.add_nudge(today, report, json.dumps(gaps))
+            except Exception:
+                report = None
+
         spinner.delete()
         with content_col:
             if report is None:
@@ -34,7 +46,7 @@ def _nudge_card(panel_ref: list) -> None:
                 ui.markdown(report).classes("text-body2")
             ui.button(
                 "Open in chat ▸",
-                on_click=lambda: asyncio.ensure_future(panel_ref[0].seed(report)),
+                on_click=lambda: asyncio.ensure_future(panel_ref[0].seed(report or "")),
             ).props("flat dense")
 
     ui.timer(0, _load, once=True)

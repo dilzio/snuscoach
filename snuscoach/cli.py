@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import re
 import shlex
@@ -1075,7 +1076,8 @@ def _nudge_report(gaps: dict) -> None:
     nudge_prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
     messages = [{"role": "user", "content": nudge_prompt}]
     print("coach> ", end="", flush=True)
-    coach.draft(messages)
+    report = coach.draft(messages)
+    db.add_nudge(today, report, json.dumps(gaps))
 
     print("\n--- Actions ---")
     for i, (desc, cmd) in enumerate(items, start=1):

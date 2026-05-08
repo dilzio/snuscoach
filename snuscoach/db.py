@@ -151,6 +151,14 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             created_at   TEXT    NOT NULL,
             updated_at   TEXT    NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS nudges (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            date       TEXT NOT NULL,
+            report     TEXT NOT NULL,
+            gaps_json  TEXT,
+            created_at TEXT NOT NULL
+        );
         """
     )
 
@@ -639,3 +647,28 @@ def get_latest_journal_entry():
         return conn.execute(
             "SELECT * FROM journal_entries ORDER BY created_at DESC, id DESC LIMIT 1"
         ).fetchone()
+
+
+def add_nudge(date: str, report: str, gaps_json: str | None = None) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO nudges (date, report, gaps_json, created_at) VALUES (?, ?, ?, ?)",
+            (date, report, gaps_json, _now()),
+        )
+        return cur.lastrowid
+
+
+def get_nudge_for_date(date: str):
+    """Return the most recent nudge row for the given YYYY-MM-DD date, or None.
+
+    Returns None (rather than raising) if the nudges table does not yet exist
+    so that callers degrade gracefully when the user hasn't run `make init`.
+    """
+    try:
+        with connect() as conn:
+            return conn.execute(
+                "SELECT * FROM nudges WHERE date = ? ORDER BY id DESC LIMIT 1",
+                (date,),
+            ).fetchone()
+    except Exception:
+        return None
