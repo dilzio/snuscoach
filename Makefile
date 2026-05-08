@@ -1,4 +1,4 @@
-.PHONY: help install init profile-create profile-list profile-show chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show stakeholder-note wins win-add voice-add voice-list voice-show backup-db test clean reflect journal journals nudge schedule-install schedule-show schedule-remove
+.PHONY: help install init profile-create profile-list profile-show chat post posts prep debrief meetings meeting-create meeting-show meeting-edit series series-add series-show series-edit stakeholders stakeholder-add stakeholder-show stakeholder-note wins win-add voice-add voice-list voice-show backup-db test test-ui clean reflect journal journals nudge schedule-install schedule-show schedule-remove ui
 
 SNUSCOACH := .venv/bin/snuscoach
 
@@ -136,8 +136,12 @@ help:  ## Show this help
 install:  ## Create venv and install snuscoach (run once)
 	python3 -m venv .venv
 	.venv/bin/pip install --upgrade pip --quiet
-	.venv/bin/pip install -e . --quiet
+	.venv/bin/pip install -e ".[dev]" --quiet
+	.venv/bin/playwright install chromium
 	@echo "Installed. Set ANTHROPIC_API_KEY in .env, then run: make init"
+
+ui:  ## Launch the web UI at localhost:8080
+	.venv/bin/python -m snuscoach.web.main
 
 init:  ## Initialize / migrate the local SQLite database
 	$(SNUSCOACH) init
@@ -260,8 +264,11 @@ backup-db:  ## Snapshot the local DB to a timestamped backup file
 reflect:  ## Generate a cross-session political pattern reflection (optional: since=YYYY-MM-DD)
 	$(SNUSCOACH) reflect $(if $(since),--since $(since),)
 
-test:  ## Run the integration test suite
-	.venv/bin/pytest
+test:  ## Run the unit/integration test suite (excludes UI browser tests)
+	.venv/bin/pytest -m "not ui"
+
+test-ui:  ## Run Playwright browser tests (requires make ui server; runs standalone)
+	.venv/bin/pytest -m ui --browser chromium
 
 clean:  ## Remove venv and build artifacts
 	rm -rf .venv build dist *.egg-info
