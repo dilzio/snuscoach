@@ -85,6 +85,8 @@ The hypothesis: politics is a learnable skill, and most of its weight is *just d
 ### 7.1 Form Factor
 Web app. Single-user. Conversational primary surface, with structured side panels for stakeholder graph and brag ledger. Local backend serves the UI; no hosted multi-tenant infrastructure.
 
+See [docs/UI_DESIGN.md](UI_DESIGN.md) for the full screen-by-screen UX design and NiceGUI architecture.
+
 ### 7.2 Data Residency — Local-First
 - All raw context (notes, profiles, journal, brag entries) stored locally in a SQLite database.
 - LLM calls send only the **task-scoped slice** needed for the current turn (e.g., one stakeholder profile + the user's question, not the whole graph). This is for token efficiency and blast-radius control, not name redaction.

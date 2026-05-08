@@ -91,6 +91,21 @@ PRD goal: web chat UI + stakeholder graph + brag ledger + visibility drafting + 
 | Scheduled nudges (daily journaling, weekly brag review) | ✅ `make schedule-install [time=HH:MM]` installs cron; `schedule-show` / `schedule-remove` manage it |
 | Coach-initiated update prompts | ✅ `make nudge` — gap analysis drives targeted questions; mode configurable via `SNUSCOACH_NUDGE_MODE` |
 
+### §6.7 Web UI (NiceGUI)
+
+Design doc: [`docs/UI_DESIGN.md`](UI_DESIGN.md)
+
+| Item | Status | Notes |
+|---|---|---|
+| Foundation: NiceGUI install, module layout, left nav, page routing, `make ui` | ❌ | |
+| Home dashboard: open chat + nudge card + upcoming meetings card + wins-gap card | ❌ | |
+| Meetings section: meeting list + series + detail view + prep/debrief chat | ❌ | |
+| Stakeholders section: list by tier + detail view + add/edit + contextual chat | ❌ | |
+| Wins & Posts section: wins ledger + post history + AI drafting chat + save post | ❌ | |
+| Journal section: entry history + daily check-in chat | ❌ | |
+| Admin section: profile list/edit + voice samples | ❌ | |
+| Integration tests for web pages (NiceGUI test client) | ❌ | |
+
 ---
 
 ## Built Beyond PRD Scope
@@ -110,7 +125,7 @@ These weren't explicitly called out in the PRD but fell out naturally or were re
 
 | PRD requirement | Status | Notes                                                                     |
 |---|--|---------------------------------------------------------------------------|
-| Web app form factor (§7.1) | ❌ | CLI for now; web layer is the next big milestone                          |
+| Web app form factor (§7.1) | ⚠️ | In progress — NiceGUI local server; see [UI_DESIGN.md](UI_DESIGN.md)     |
 | Local SQLite (§7.2) | ✅ | `~/.snuscoach/snuscoach.db`                                               |
 | Task-scoped context slicing (§7.2) | ⚠️ | Full graph sent on every turn; scoping not yet implemented                |
 | Claude Opus for coaching (§7.3) | ✅ | All calls use `claude-opus-4-7`                                           |
