@@ -1,12 +1,20 @@
+import asyncio
+from typing import Callable
+
 from nicegui import ui
 
 
 class ChatPanel:
-    """Reusable chat widget. Wired to coach functions in later passes."""
+    """Reusable chat widget. Pass coach_fn to wire AI responses."""
 
-    def __init__(self, placeholder: str = "What's on your mind?") -> None:
+    def __init__(
+        self,
+        placeholder: str = "What's on your mind?",
+        coach_fn: Callable | None = None,
+    ) -> None:
         self.messages: list[dict] = []
         self.placeholder = placeholder
+        self.coach_fn = coach_fn
         self._build()
 
     def _build(self) -> None:
@@ -28,7 +36,38 @@ class ChatPanel:
         if not text:
             return
         self.input.value = ""
+        self.messages.append({"role": "user", "content": text})
+
         with self.chat_column:
             ui.chat_message(text, name="You", sent=True)
-            ui.chat_message("(Coach responses will appear here once wired up.)", name="Coach")
+
+        await self._get_reply()
         self.scroll.scroll_to(percent=1.0)
+
+    async def _get_reply(self) -> None:
+        with self.chat_column:
+            with ui.chat_message(name="Coach", sent=False) as coach_bubble:
+                response_slot = ui.column().classes("w-full")
+                with response_slot:
+                    spinner = ui.spinner("dots", size="sm")
+
+        if self.coach_fn:
+            try:
+                loop = asyncio.get_event_loop()
+                reply = await loop.run_in_executor(None, self.coach_fn, list(self.messages))
+            except Exception:
+                reply = "(Coach unavailable — check ANTHROPIC_API_KEY)"
+        else:
+            reply = "(Coach not connected.)"
+
+        spinner.delete()
+        self.messages.append({"role": "assistant", "content": reply})
+        with response_slot:
+            ui.markdown(reply)
+
+        self.scroll.scroll_to(percent=1.0)
+
+    async def seed(self, text: str) -> None:
+        """Pre-load a user message and trigger a coach reply."""
+        self.input.value = text
+        await self._on_send()
