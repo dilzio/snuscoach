@@ -3,25 +3,54 @@ from typing import Callable
 
 from nicegui import ui
 
+from snuscoach import db
+
 
 class ChatPanel:
-    """Reusable chat widget. Pass coach_fn to wire AI responses."""
+    """Reusable chat widget. Pass coach_fn to wire AI responses.
+
+    thread_key: stable string key (e.g. "home-nudge-2026-05-08"). When set,
+    prior messages are loaded from DB on init and new messages are persisted.
+    Defaults to None (in-memory only).
+    """
 
     def __init__(
         self,
         placeholder: str = "What's on your mind?",
         coach_fn: Callable | None = None,
+        thread_key: str | None = None,
     ) -> None:
-        self.messages: list[dict] = []
         self.placeholder = placeholder
         self.coach_fn = coach_fn
+        self.thread_id: int | None = None
+        self.messages: list[dict] = []
+
+        if thread_key is not None:
+            try:
+                self.thread_id = db.get_or_create_thread(thread_key)
+                rows = db.list_chat_messages(self.thread_id)
+                self.messages = [{"role": r["role"], "content": r["content"]} for r in rows]
+            except Exception:
+                pass  # DB unavailable — degrade to in-memory mode
+
         self._build()
+
+    def _render_message(self, role: str, content: str) -> None:
+        """Render a completed message into chat_column (no spinner)."""
+        with self.chat_column:
+            if role == "user":
+                ui.chat_message(content, name="You", sent=True)
+            else:
+                with ui.chat_message(name="Coach", sent=False):
+                    ui.markdown(content).classes("text-body2")
 
     def _build(self) -> None:
         with ui.column().classes("w-full h-full gap-0"):
             self.scroll = ui.scroll_area().classes("flex-1 w-full")
             with self.scroll:
                 self.chat_column = ui.column().classes("w-full gap-2 q-pa-md")
+                for msg in self.messages:
+                    self._render_message(msg["role"], msg["content"])
 
             with ui.row().classes("w-full items-center q-pa-sm gap-2"):
                 self.input = ui.input(placeholder=self.placeholder).classes(
@@ -30,6 +59,8 @@ class ChatPanel:
                 ui.button("Send", on_click=self._on_send).props("dense")
 
         self.input.on("keydown.enter", self._on_send)
+        if self.messages:
+            self.scroll.scroll_to(percent=1.0)
 
     async def _on_send(self) -> None:
         text = self.input.value.strip()
@@ -37,16 +68,18 @@ class ChatPanel:
             return
         self.input.value = ""
         self.messages.append({"role": "user", "content": text})
-
-        with self.chat_column:
-            ui.chat_message(text, name="You", sent=True)
-
+        if self.thread_id is not None:
+            try:
+                db.add_chat_message(self.thread_id, "user", text)
+            except Exception:
+                pass
+        self._render_message("user", text)
         await self._get_reply()
         self.scroll.scroll_to(percent=1.0)
 
     async def _get_reply(self) -> None:
         with self.chat_column:
-            with ui.chat_message(name="Coach", sent=False) as coach_bubble:
+            with ui.chat_message(name="Coach", sent=False):
                 response_slot = ui.column().classes("w-full")
                 with response_slot:
                     spinner = ui.spinner("dots", size="sm")
@@ -62,12 +95,24 @@ class ChatPanel:
 
         spinner.delete()
         self.messages.append({"role": "assistant", "content": reply})
+        if self.thread_id is not None:
+            try:
+                db.add_chat_message(self.thread_id, "assistant", reply)
+            except Exception:
+                pass
         with response_slot:
             ui.markdown(reply)
 
         self.scroll.scroll_to(percent=1.0)
 
     async def seed(self, text: str) -> None:
-        """Pre-load a user message and trigger a coach reply."""
+        """Pre-load a user message and trigger a coach reply.
+
+        If the thread already has messages (restored from DB or previously seeded),
+        just scroll to the bottom — don't resend.
+        """
+        if self.messages:
+            self.scroll.scroll_to(percent=1.0)
+            return
         self.input.value = text
         await self._on_send()

@@ -115,7 +115,9 @@ def home_page() -> None:
             _wins_gap_card()
 
         with ui.column().classes("flex-1 h-full"):
+            thread_key = f"home-nudge-{date.today().isoformat()}"
             panel[0] = ChatPanel(
                 placeholder="What's on your mind?",
                 coach_fn=coach.conversation,
+                thread_key=thread_key,
             )

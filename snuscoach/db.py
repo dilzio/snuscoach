@@ -159,6 +159,21 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             gaps_json  TEXT,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS chat_threads (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            key        TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id  INTEGER NOT NULL REFERENCES chat_threads(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
         """
     )
 
@@ -672,3 +687,48 @@ def get_nudge_for_date(date: str):
             ).fetchone()
     except Exception:
         return None
+
+
+def get_or_create_thread(key: str) -> int:
+    """Return the thread id for the given key, creating the row if absent."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id FROM chat_threads WHERE key = ?", (key,)
+        ).fetchone()
+        if row:
+            return row["id"]
+        cur = conn.execute(
+            "INSERT INTO chat_threads (key, created_at, updated_at) VALUES (?, ?, ?)",
+            (key, _now(), _now()),
+        )
+        return cur.lastrowid
+
+
+def add_chat_message(thread_id: int, role: str, content: str) -> int:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE chat_threads SET updated_at = ? WHERE id = ?",
+            (_now(), thread_id),
+        )
+        cur = conn.execute(
+            "INSERT INTO chat_messages (thread_id, role, content, created_at)"
+            " VALUES (?, ?, ?, ?)",
+            (thread_id, role, content, _now()),
+        )
+        return cur.lastrowid
+
+
+def list_chat_messages(thread_id: int) -> list[dict]:
+    """Return all messages for a thread in chronological order.
+
+    Returns [] gracefully if the tables are absent (user hasn't run make init).
+    """
+    try:
+        with connect() as conn:
+            return conn.execute(
+                "SELECT role, content FROM chat_messages"
+                " WHERE thread_id = ? ORDER BY id ASC",
+                (thread_id,),
+            ).fetchall()
+    except Exception:
+        return []
