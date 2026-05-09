@@ -84,24 +84,30 @@ class ChatPanel:
                 with response_slot:
                     spinner = ui.spinner("dots", size="sm")
 
+        error: str | None = None
+        reply: str | None = None
         if self.coach_fn:
             try:
                 loop = asyncio.get_event_loop()
                 reply = await loop.run_in_executor(None, self.coach_fn, list(self.messages))
             except Exception:
-                reply = "(Coach unavailable — check ANTHROPIC_API_KEY)"
+                error = "Coach unavailable — check ANTHROPIC_API_KEY"
         else:
-            reply = "(Coach not connected.)"
+            error = "Coach not connected."
 
         spinner.delete()
-        self.messages.append({"role": "assistant", "content": reply})
-        if self.thread_id is not None:
-            try:
-                db.add_chat_message(self.thread_id, "assistant", reply)
-            except Exception:
-                pass
+        if reply is not None:
+            self.messages.append({"role": "assistant", "content": reply})
+            if self.thread_id is not None:
+                try:
+                    db.add_chat_message(self.thread_id, "assistant", reply)
+                except Exception:
+                    pass
         with response_slot:
-            ui.markdown(reply)
+            if error is not None:
+                ui.label(error).classes("text-body2 text-grey")
+            else:
+                ui.markdown(reply)
 
         self.scroll.scroll_to(percent=1.0)
 
