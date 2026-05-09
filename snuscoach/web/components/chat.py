@@ -33,6 +33,11 @@ class ChatPanel:
             except Exception:
                 pass  # DB unavailable — degrade to in-memory mode
 
+        # Drop any trailing user messages that have no assistant reply
+        # (left over from a previous session where the LLM call failed).
+        while self.messages and self.messages[-1]["role"] == "user":
+            self.messages.pop()
+
         self._build()
 
     def _render_message(self, role: str, content: str) -> None:
@@ -68,11 +73,6 @@ class ChatPanel:
             return
         self.input.value = ""
         self.messages.append({"role": "user", "content": text})
-        if self.thread_id is not None:
-            try:
-                db.add_chat_message(self.thread_id, "user", text)
-            except Exception:
-                pass
         self._render_message("user", text)
         await self._get_reply()
         self.scroll.scroll_to(percent=1.0)
@@ -97,12 +97,13 @@ class ChatPanel:
 
         spinner.delete()
         if reply is not None:
-            self.messages.append({"role": "assistant", "content": reply})
             if self.thread_id is not None:
                 try:
+                    db.add_chat_message(self.thread_id, "user", self.messages[-1]["content"])
                     db.add_chat_message(self.thread_id, "assistant", reply)
                 except Exception:
                     pass
+            self.messages.append({"role": "assistant", "content": reply})
         with response_slot:
             if error is not None:
                 ui.label(error).classes("text-body2 text-grey")
