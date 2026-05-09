@@ -35,7 +35,8 @@ def test_debrief_runs_coach_when_no_existing(monkeypatch, temp_db):
     assert m["debrief_summary"] == "Summary content."
 
 
-def test_debrief_saves_last_iterated_summary(monkeypatch, temp_db):
+def test_debrief_saves_full_multiturn_transcript(monkeypatch, temp_db):
+    """All coach replies from a multi-turn debrief session are saved, not just the last."""
     mid = db.add_meeting("X", "2026-05-05")
     _stub_inputs(monkeypatch, ["push back", "tighten", "", "y"])
     monkeypatch.setattr(cli, "_input_multiline", lambda *a, **kw: "notes")
@@ -44,7 +45,12 @@ def test_debrief_saves_last_iterated_summary(monkeypatch, temp_db):
     monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
 
     cli.cmd_meeting_debrief(_Args(id=mid))
-    assert db.get_meeting(mid)["debrief_summary"] == "THIRD"
+    saved = db.get_meeting(mid)["debrief_summary"]
+    assert "FIRST" in saved
+    assert "SECOND" in saved
+    assert "THIRD" in saved
+    assert saved.startswith("FIRST")
+    assert "## Coach updates" in saved
 
 
 def test_debrief_skips_save_when_user_declines(monkeypatch, temp_db):

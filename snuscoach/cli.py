@@ -55,6 +55,35 @@ def _iterate_with_followups(
     return messages, reply
 
 
+def _format_session_transcript(messages: list[dict]) -> str:
+    """Format a full _iterate_with_followups session into a stored brief/summary.
+
+    Skips messages[0] (the task prompt — not user-authored). Records all coach
+    replies and any user follow-up turns in order.
+
+    Single-turn sessions produce only the coach reply, identical to prior
+    behaviour, so existing saved data is unaffected.
+    """
+    parts: list[str] = []
+    coach_count = 0
+    first_user_seen = False
+
+    for msg in messages:
+        if msg["role"] == "user":
+            if not first_user_seen:
+                first_user_seen = True
+                continue  # skip the task/system prompt
+            parts.append(f"---\n\n**Your clarification:**\n{msg['content']}")
+        else:
+            coach_count += 1
+            if coach_count == 1:
+                parts.append(msg["content"])  # initial brief — no extra header
+            else:
+                parts.append(f"## Coach updates\n\n{msg['content']}")
+
+    return "\n\n".join(parts)
+
+
 def _input_multiline(label: str, initial: str = "") -> str:
     """Open $EDITOR on a temp file for editable multiline input."""
     editor = os.environ.get("EDITOR") or os.environ.get("VISUAL") or "vi"
@@ -543,7 +572,8 @@ def cmd_meeting_prep(args):
         If you need information you don't have (about a stakeholder, the work, the org dynamics), ASK rather than guess.
         """
     ).strip()
-    _, brief = _iterate_with_followups(user_msg)
+    messages, _ = _iterate_with_followups(user_msg)
+    brief = _format_session_transcript(messages)
 
     print()
     answer = input("Save this prep brief? [Y/n]: ").strip().lower()
@@ -608,7 +638,8 @@ def cmd_meeting_debrief(args):
         Push back if my read of the meeting is naive or self-serving — don't validate by default.
         """
     ).strip()
-    _, summary = _iterate_with_followups(user_msg)
+    messages, _ = _iterate_with_followups(user_msg)
+    summary = _format_session_transcript(messages)
 
     print()
     answer = input("Save this debrief? [Y/n]: ").strip().lower()

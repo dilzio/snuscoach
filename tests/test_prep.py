@@ -61,7 +61,8 @@ def test_prep_reuses_existing_context(monkeypatch, temp_db):
     assert m["prep_brief"] == "Brief."
 
 
-def test_prep_saves_last_iterated_brief(monkeypatch, temp_db):
+def test_prep_saves_full_multiturn_transcript(monkeypatch, temp_db):
+    """All coach replies from a multi-turn session are saved, not just the last."""
     mid = db.add_meeting("1:1 with Sarah", "2026-05-05")
     _stub_inputs(
         monkeypatch,
@@ -73,7 +74,13 @@ def test_prep_saves_last_iterated_brief(monkeypatch, temp_db):
     monkeypatch.setattr(cli.coach, "conversation", lambda _msgs: next(replies))
 
     cli.cmd_meeting_prep(_Args(id=mid))
-    assert db.get_meeting(mid)["prep_brief"] == "THIRD final"
+    saved = db.get_meeting(mid)["prep_brief"]
+    assert "FIRST" in saved
+    assert "SECOND" in saved
+    assert "THIRD final" in saved
+    # Initial brief has no header; subsequent replies are marked as updates
+    assert saved.startswith("FIRST")
+    assert "## Coach updates" in saved
 
 
 def test_prep_skips_save_when_user_declines(monkeypatch, temp_db):
