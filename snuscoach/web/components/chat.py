@@ -38,6 +38,18 @@ class ChatPanel:
         while self.messages and self.messages[-1]["role"] == "user":
             self.messages.pop()
 
+        # Drop the last exchange if the assistant reply is an error string that
+        # old code incorrectly persisted as a real reply.
+        _ERROR_MARKERS = ("Coach unavailable", "Coach not connected")
+        if (
+            len(self.messages) >= 2
+            and self.messages[-1]["role"] == "assistant"
+            and any(m in self.messages[-1]["content"] for m in _ERROR_MARKERS)
+        ):
+            self.messages.pop()
+            if self.messages and self.messages[-1]["role"] == "user":
+                self.messages.pop()
+
         self._build()
 
     def _render_message(self, role: str, content: str) -> None:
@@ -90,7 +102,7 @@ class ChatPanel:
             try:
                 loop = asyncio.get_event_loop()
                 reply = await loop.run_in_executor(None, self.coach_fn, list(self.messages))
-            except Exception:
+            except (Exception, SystemExit):
                 error = "Coach unavailable — check ANTHROPIC_API_KEY"
         else:
             error = "Coach not connected."
