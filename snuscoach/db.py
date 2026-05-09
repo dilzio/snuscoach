@@ -689,6 +689,17 @@ def get_nudge_for_date(date: str):
         return None
 
 
+def get_latest_nudge():
+    """Return the most recently created nudge row regardless of date, or None."""
+    try:
+        with connect() as conn:
+            return conn.execute(
+                "SELECT * FROM nudges ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+    except Exception:
+        return None
+
+
 def get_or_create_thread(key: str) -> int:
     """Return the thread id for the given key, creating the row if absent."""
     with connect() as conn:

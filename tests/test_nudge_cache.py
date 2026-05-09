@@ -45,6 +45,22 @@ def test_get_nudge_latest_when_multiple_rows(temp_db):
     assert row["report"] == "Second nudge."
 
 
+def test_get_latest_nudge_returns_most_recent_across_dates(temp_db):
+    db.add_nudge("2026-05-07", "Yesterday's nudge.")
+    db.add_nudge("2026-05-08", "Today's nudge.")
+    row = db.get_latest_nudge()
+    assert row is not None
+    assert row["report"] == "Today's nudge."
+
+
+def test_get_latest_nudge_returns_none_when_empty(temp_db):
+    assert db.get_latest_nudge() is None
+
+
+def test_get_latest_nudge_missing_table_returns_none(temp_db_path):
+    assert db.get_latest_nudge() is None
+
+
 def test_get_nudge_missing_table_returns_none(temp_db_path):
     """get_nudge_for_date returns None gracefully if nudges table doesn't exist."""
     # temp_db_path fixture sets SNUSCOACH_DB but does NOT call init_db,

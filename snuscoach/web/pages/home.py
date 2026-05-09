@@ -26,13 +26,12 @@ def _nudge_card(panel_ref: list) -> None:
         report: str | None = None
         gaps: dict | None = None
 
-        # Cache hit: serve stored report, no LLM call
+        # Today's nudge: exact date match, no LLM call needed
         cached = db.get_nudge_for_date(today)
         if cached:
             report = cached["report"]
         else:
-            # Cache miss: LLM call in its own try/except so a DB save failure
-            # afterwards does not overwrite a successfully-generated report.
+            # No nudge for today — try generating one via LLM
             try:
                 gaps = _compute_nudge_gaps()
                 prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
@@ -48,6 +47,13 @@ def _nudge_card(panel_ref: list) -> None:
                     db.add_nudge(today, report, json.dumps(gaps))
                 except Exception:
                     pass  # caching failed; nudge still displays from in-memory report
+
+            # LLM unavailable and no today's nudge: fall back to the most recent
+            # nudge from any prior date rather than showing an error
+            if report is None:
+                prior = db.get_latest_nudge()
+                if prior:
+                    report = prior["report"]
 
         spinner.delete()
         with content_col:
