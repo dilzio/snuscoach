@@ -107,6 +107,30 @@ def _do_delete_meeting(meeting_id: int, main_container: list) -> None:
     ui.notify("Meeting deleted.")
 
 
+def _open_new_series_dialog(series_select) -> None:
+    """Create a new meeting series and auto-select it in series_select."""
+    with ui.dialog() as dlg, ui.card().classes("w-64"):
+        ui.label("New Series").classes("text-subtitle1 text-bold q-mb-sm")
+        name_in = ui.input(label="Series name *").classes("w-full")
+
+        def _create():
+            name = name_in.value.strip()
+            if not name:
+                ui.notify("Name is required.", type="warning")
+                return
+            new_id = db.add_meeting_series(name)
+            series_select.options = _series_dict(db.list_meeting_series())
+            series_select.value = new_id
+            series_select.update()
+            dlg.close()
+            ui.notify(f'Series "{name}" created.')
+
+        with ui.row().classes("w-full justify-end gap-2 q-mt-sm"):
+            ui.button("Cancel", on_click=dlg.close).props("flat dense")
+            ui.button("Create", on_click=_create).props("color=primary dense")
+    dlg.open()
+
+
 # ---------------------------------------------------------------------------
 # AI output display helpers (read-only + Edit toggle)
 # ---------------------------------------------------------------------------
@@ -362,6 +386,10 @@ def _render_detail_left(
         series_in[0] = ui.select(
             label="Series", options=series_opts, value=current_series
         ).classes("w-full")
+        ui.button(
+            "+ New series",
+            on_click=lambda: _open_new_series_dialog(series_in[0]),
+        ).props("flat dense size=sm").classes("text-caption q-mt-xs")
 
         def _save_setup():
             series_key = series_in[0].value
@@ -435,6 +463,10 @@ def _open_new_meeting_dialog(main_container: list) -> None:
         series_in = ui.select(
             label="Series", options=series_opts, value=_NO_SERIES
         ).classes("w-full")
+        ui.button(
+            "+ New series",
+            on_click=lambda: _open_new_series_dialog(series_in),
+        ).props("flat dense size=sm").classes("text-caption q-mt-xs")
 
         def _create():
             title = title_in.value.strip()
@@ -481,12 +513,12 @@ def _render_group_table(
 
     with ui.element("table").classes("w-full").style(
         "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid rgba(255,255,255,0.18); border-radius: 4px"
+        "border: 1px solid rgba(0,0,0,0.15); border-radius: 4px"
     ):
         with ui.element("thead"):
             with ui.element("tr").style(
-                "border-bottom: 2px solid rgba(255,255,255,0.25);"
-                "background: rgba(255,255,255,0.07)"
+                "border-bottom: 2px solid rgba(0,0,0,0.2);"
+                "background: rgba(0,0,0,0.05)"
             ):
                 for label, width in [
                     ("Meeting", "32%"),
@@ -496,9 +528,10 @@ def _render_group_table(
                     ("Debrief", "9%"),
                     ("", "10%"),
                 ]:
-                    ui.element("th").classes("text-caption text-grey text-left q-pa-xs").style(
+                    with ui.element("th").classes("text-caption text-grey text-left q-pa-xs").style(
                         f"width: {width}; font-weight: 500"
-                    ).text = label
+                    ):
+                        ui.label(label)
 
         with ui.element("tbody"):
             for m in meetings:
@@ -507,7 +540,7 @@ def _render_group_table(
                 mid = m["id"]
 
                 with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid rgba(255,255,255,0.14)"
+                    "border-bottom: 1px solid rgba(0,0,0,0.1)"
                 ):
                     # Meeting name — click opens detail
                     with ui.element("td").classes("q-pa-xs").on(

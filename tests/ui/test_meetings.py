@@ -493,3 +493,70 @@ def test_delete_confirm_removes_meeting(
     page.locator(".q-dialog button:has-text('Delete')").first.click()
     page.wait_for_timeout(800)
     expect(page.locator("text=Q2 Planning")).to_have_count(0)
+
+
+# ---------------------------------------------------------------------------
+# Create new series from dialog / detail view
+# ---------------------------------------------------------------------------
+
+def test_new_series_button_visible_in_new_meeting_dialog(
+    page: Page, ui_base_url: str
+) -> None:
+    """+ New series button is visible inside the new meeting dialog."""
+    _goto(page, f"{ui_base_url}{MEETINGS}")
+    page.locator("text=+ New Meeting").first.click()
+    page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
+    expect(page.locator(".q-dialog button:has-text('+ New series')").first).to_be_visible()
+
+
+def test_create_series_from_new_meeting_dialog(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Creating a series from the new meeting dialog auto-selects it in the dropdown."""
+    _goto(page, f"{ui_base_url}{MEETINGS}")
+    page.locator("text=+ New Meeting").first.click()
+    page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
+
+    # Open the new series sub-dialog
+    page.locator(".q-dialog button:has-text('+ New series')").first.click()
+    page.wait_for_timeout(400)
+
+    # There are now two nested dialogs — fill the series name in the inner one
+    page.locator(".q-dialog input").last.fill("My New Series")
+    page.locator(".q-dialog button:has-text('Create')").last.click()
+    page.wait_for_timeout(500)
+
+    # The series should now be in the DB
+    conn = sqlite3.connect(str(ui_db_path))
+    row = conn.execute(
+        "SELECT id FROM meeting_series WHERE name='My New Series'"
+    ).fetchone()
+    conn.close()
+    assert row is not None, "New series not found in DB"
+
+
+def test_new_series_button_visible_in_detail_view(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """+ New series button is visible in the Meeting Setup accordion on the detail view."""
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("button:has-text('+ New series')").first).to_be_visible()
+
+
+def test_create_series_from_detail_view(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Creating a series from the detail view persists it to the DB."""
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    page.locator("button:has-text('+ New series')").first.click()
+    page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
+    page.locator(".q-dialog input").first.fill("Detail View Series")
+    page.locator(".q-dialog button:has-text('Create')").first.click()
+    page.wait_for_timeout(500)
+
+    conn = sqlite3.connect(str(ui_db_path))
+    row = conn.execute(
+        "SELECT id FROM meeting_series WHERE name='Detail View Series'"
+    ).fetchone()
+    conn.close()
+    assert row is not None, "New series not found in DB"
