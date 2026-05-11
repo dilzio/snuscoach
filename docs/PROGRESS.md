@@ -2,7 +2,7 @@
 
 Tracks build state against the PRD. Update this when features land or scope shifts.
 
-Last updated: 2026-05-07 · Current branch: `feature/journaling-and-nudge`
+Last updated: 2026-05-10 · Current branch: `feature/meetings-ui`
 
 ---
 
@@ -99,7 +99,7 @@ Design doc: [`docs/UI_DESIGN.md`](UI_DESIGN.md)
 |---|---|---|
 | Foundation: NiceGUI install, module layout, left nav, page routing, `make ui` | ✅ | `feature/ui-foundation`; Playwright test suite in `tests/ui/` |
 | Home dashboard: open chat + nudge card + upcoming meetings card + wins-gap card | ✅ | `feature/home-dashboard`; ChatPanel wired to Opus; Playwright tests in `tests/ui/test_home_dashboard.py` |
-| Meetings section: meeting list + series + detail view + prep/debrief chat | ❌ | |
+| Meetings section: meeting list + series + detail view + prep/debrief chat | ✅ | `feature/meetings-ui`; Playwright tests in `tests/ui/test_meetings.py` |
 | Stakeholders section: list by tier + detail view + add/edit + contextual chat | ❌ | |
 | Wins & Posts section: wins ledger + post history + AI drafting chat + save post | ❌ | |
 | Journal section: entry history + daily check-in chat | ❌ | |
