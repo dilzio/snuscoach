@@ -743,3 +743,53 @@ def list_chat_messages(thread_id: int) -> list[dict]:
             ).fetchall()
     except Exception:
         return []
+
+
+def purge_canned_responses() -> dict:
+    """Delete or null-out all DB rows containing the canned response marker.
+
+    Meetings are preserved — only LLM-generated fields (prep_brief,
+    debrief_summary) are cleared. Chat threads that contain any canned
+    message are fully deleted (messages first to satisfy the FK constraint).
+    """
+    marker = "%[CANNED RESPONSE]%"
+    counts: dict[str, int] = {}
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM posts WHERE content LIKE ?", (marker,))
+        counts["posts"] = cur.rowcount
+
+        cur = conn.execute("DELETE FROM reflections WHERE content LIKE ?", (marker,))
+        counts["reflections"] = cur.rowcount
+
+        cur = conn.execute(
+            "DELETE FROM journal_entries WHERE content LIKE ? OR coach_prompt LIKE ?",
+            (marker, marker),
+        )
+        counts["journal_entries"] = cur.rowcount
+
+        cur = conn.execute("DELETE FROM nudges WHERE report LIKE ?", (marker,))
+        counts["nudges"] = cur.rowcount
+
+        cur = conn.execute(
+            "UPDATE meetings SET prep_brief = NULL, debrief_summary = NULL"
+            " WHERE prep_brief LIKE ? OR debrief_summary LIKE ?",
+            (marker, marker),
+        )
+        counts["meetings_cleared"] = cur.rowcount
+
+        canned_rows = conn.execute(
+            "SELECT DISTINCT thread_id FROM chat_messages WHERE content LIKE ?",
+            (marker,),
+        ).fetchall()
+        if canned_rows:
+            ids = [r[0] for r in canned_rows]
+            placeholders = ",".join("?" * len(ids))
+            conn.execute(
+                f"DELETE FROM chat_messages WHERE thread_id IN ({placeholders})", ids
+            )
+            conn.execute(
+                f"DELETE FROM chat_threads WHERE id IN ({placeholders})", ids
+            )
+        counts["chat_threads"] = len(canned_rows)
+
+    return counts

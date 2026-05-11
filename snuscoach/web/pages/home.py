@@ -35,10 +35,13 @@ def _nudge_card(panel_ref: list) -> None:
             try:
                 gaps = _compute_nudge_gaps()
                 prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
-                loop = asyncio.get_running_loop()
-                report = await loop.run_in_executor(
-                    None, coach.draft, [{"role": "user", "content": prompt}]
-                )
+                if coach.is_stubbed("NUDGE_REPORT"):
+                    report = coach.canned_response("NUDGE_REPORT")
+                else:
+                    loop = asyncio.get_running_loop()
+                    report = await loop.run_in_executor(
+                        None, coach.draft, [{"role": "user", "content": prompt}]
+                    )
             except Exception:
                 report = None
 
@@ -124,6 +127,6 @@ def home_page() -> None:
             thread_key = f"home-nudge-{date.today().isoformat()}"
             panel[0] = ChatPanel(
                 placeholder="What's on your mind?",
-                coach_fn=coach.conversation,
+                coach_fn=coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation,
                 thread_key=thread_key,
             )

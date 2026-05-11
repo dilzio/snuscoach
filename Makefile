@@ -264,6 +264,9 @@ backup-db:  ## Snapshot the local DB to a timestamped backup file
 reflect:  ## Generate a cross-session political pattern reflection (optional: since=YYYY-MM-DD)
 	$(SNUSCOACH) reflect $(if $(since),--since $(since),)
 
+purge-stubs:  ## Remove all canned/stub LLM responses from the database
+	$(SNUSCOACH) purge-stubs
+
 test:  ## Run the unit/integration test suite (excludes UI browser tests)
 	.venv/bin/pytest -m "not ui"
 
