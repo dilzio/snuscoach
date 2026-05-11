@@ -98,7 +98,7 @@ Design doc: [`docs/UI_DESIGN.md`](UI_DESIGN.md)
 | Item | Status | Notes |
 |---|---|---|
 | Foundation: NiceGUI install, module layout, left nav, page routing, `make ui` | ✅ | `feature/ui-foundation`; Playwright test suite in `tests/ui/` |
-| Home dashboard: open chat + nudge card + upcoming meetings card + wins-gap card | ❌ | |
+| Home dashboard: open chat + nudge card + upcoming meetings card + wins-gap card | ✅ | `feature/home-dashboard`; ChatPanel wired to Opus; Playwright tests in `tests/ui/test_home_dashboard.py` |
 | Meetings section: meeting list + series + detail view + prep/debrief chat | ❌ | |
 | Stakeholders section: list by tier + detail view + add/edit + contextual chat | ❌ | |
 | Wins & Posts section: wins ledger + post history + AI drafting chat + save post | ❌ | |
@@ -164,4 +164,5 @@ These weren't explicitly called out in the PRD but fell out naturally or were re
 - **Sonnet routing** — routine drafting (post, win log) could use Sonnet; deep coaching (debrief, prep, chat) warrants Opus. No routing yet.
 - **DB migration UX** — if a user has a pre-`user_profiles` DB and runs a coaching command, they get "Database not initialized" which is misleading. Should detect existing DB with missing table and suggest `make init`.
 - **Journal** — `journal_entries` table now exists; last 7 entries injected into context block. Embedding search still not implemented — all context loaded on every turn (§7.4).
+- **Nudge caching** — `nudges` table persists LLM report; web UI and CLI both write to it; web UI reads cached report if one exists for today (no repeated LLM calls). Run `make init` to add the table to existing DBs.
 - **Embedding / retrieval** — currently the full graph is dumped into context on every turn. Not scalable past a few hundred meetings/stakeholders.

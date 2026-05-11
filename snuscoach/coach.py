@@ -58,15 +58,18 @@ def _stream(messages: list[dict], model: str) -> str:
     if model == OPUS_MODEL:
         kwargs["thinking"] = {"type": "adaptive"}
         kwargs["output_config"] = {"effort": "high"}
-    with client.messages.stream(**kwargs) as stream:
-        for text in stream.text_stream:
-            print(text, end="", flush=True)
-            parts.append(text)
-        print()
-        try:
-            final_message = stream.get_final_message()
-        except Exception:
-            final_message = None
+    try:
+        with client.messages.stream(**kwargs) as stream:
+            for text in stream.text_stream:
+                print(text, end="", flush=True)
+                parts.append(text)
+            print()
+            try:
+                final_message = stream.get_final_message()
+            except Exception:
+                final_message = None
+    except Exception as xn:
+        parts.append(f"\n\nANTHROPIC API ERROR: {xn.message}")
     elapsed_ms = int((time.monotonic() - started) * 1000)
     response_text = "".join(parts)
     logger.log_call(

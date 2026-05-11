@@ -151,6 +151,29 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             created_at   TEXT    NOT NULL,
             updated_at   TEXT    NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS nudges (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            date       TEXT NOT NULL,
+            report     TEXT NOT NULL,
+            gaps_json  TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_threads (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            key        TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id  INTEGER NOT NULL REFERENCES chat_threads(id),
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
         """
     )
 
@@ -639,3 +662,84 @@ def get_latest_journal_entry():
         return conn.execute(
             "SELECT * FROM journal_entries ORDER BY created_at DESC, id DESC LIMIT 1"
         ).fetchone()
+
+
+def add_nudge(date: str, report: str, gaps_json: str | None = None) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO nudges (date, report, gaps_json, created_at) VALUES (?, ?, ?, ?)",
+            (date, report, gaps_json, _now()),
+        )
+        return cur.lastrowid
+
+
+def get_nudge_for_date(date: str):
+    """Return the most recent nudge row for the given YYYY-MM-DD date, or None.
+
+    Returns None (rather than raising) if the nudges table does not yet exist
+    so that callers degrade gracefully when the user hasn't run `make init`.
+    """
+    try:
+        with connect() as conn:
+            return conn.execute(
+                "SELECT * FROM nudges WHERE date = ? ORDER BY id DESC LIMIT 1",
+                (date,),
+            ).fetchone()
+    except Exception:
+        return None
+
+
+def get_latest_nudge():
+    """Return the most recently created nudge row regardless of date, or None."""
+    try:
+        with connect() as conn:
+            return conn.execute(
+                "SELECT * FROM nudges ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+    except Exception:
+        return None
+
+
+def get_or_create_thread(key: str) -> int:
+    """Return the thread id for the given key, creating the row if absent."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id FROM chat_threads WHERE key = ?", (key,)
+        ).fetchone()
+        if row:
+            return row["id"]
+        cur = conn.execute(
+            "INSERT INTO chat_threads (key, created_at, updated_at) VALUES (?, ?, ?)",
+            (key, _now(), _now()),
+        )
+        return cur.lastrowid
+
+
+def add_chat_message(thread_id: int, role: str, content: str) -> int:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE chat_threads SET updated_at = ? WHERE id = ?",
+            (_now(), thread_id),
+        )
+        cur = conn.execute(
+            "INSERT INTO chat_messages (thread_id, role, content, created_at)"
+            " VALUES (?, ?, ?, ?)",
+            (thread_id, role, content, _now()),
+        )
+        return cur.lastrowid
+
+
+def list_chat_messages(thread_id: int) -> list[dict]:
+    """Return all messages for a thread in chronological order.
+
+    Returns [] gracefully if the tables are absent (user hasn't run make init).
+    """
+    try:
+        with connect() as conn:
+            return conn.execute(
+                "SELECT role, content FROM chat_messages"
+                " WHERE thread_id = ? ORDER BY id ASC",
+                (thread_id,),
+            ).fetchall()
+    except Exception:
+        return []

@@ -30,7 +30,14 @@ def ui_server(tmp_path_factory):
         "SNUSCOACH_DB": str(db_path),
         "SNUSCOACH_PORT": str(port),
         "SNUSCOACH_LOG": "false",
+        # Fake key so AI calls fail fast and hit error handlers rather than
+        # making real API calls or blocking indefinitely.
+        "ANTHROPIC_API_KEY": "test-fake-key-ui-tests",
     }
+    # NiceGUI 3.x detects pytest via PYTEST_CURRENT_TEST and enters a screen-test
+    # mode that requires NICEGUI_SCREEN_TEST_PORT. We use Playwright instead of
+    # NiceGUI's native test client, so strip that marker from the subprocess env.
+    env.pop("PYTEST_CURRENT_TEST", None)
 
     subprocess.run(
         [sys.executable, "-m", "snuscoach", "init"],
@@ -56,7 +63,7 @@ def ui_server(tmp_path_factory):
         print(f"\nServer log:\n{log_path.read_text()}")
         raise
 
-    yield base_url
+    yield base_url, db_path
 
     proc.terminate()
     proc.wait(timeout=5)
@@ -65,4 +72,9 @@ def ui_server(tmp_path_factory):
 
 @pytest.fixture
 def ui_base_url(ui_server):
-    return ui_server
+    return ui_server[0]
+
+
+@pytest.fixture
+def ui_db_path(ui_server):
+    return ui_server[1]

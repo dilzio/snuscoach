@@ -1,5 +1,11 @@
 import os
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from nicegui import ui
 
 import snuscoach.web.pages  # noqa: F401 — registers all @ui.page routes
