@@ -10,7 +10,7 @@ from snuscoach.web.components.nav import create_nav
 
 
 # ---------------------------------------------------------------------------
-# Prompt builders (mirror CLI templates in cli.py lines 555–575, 621–643)
+# Prompt builders (mirror CLI templates in cli.py)
 # ---------------------------------------------------------------------------
 
 def _build_prep_prompt(m) -> str:
@@ -59,128 +59,257 @@ def _build_debrief_prompt(m) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Shared async helpers
+# ui.select() sentinel — series IDs start at 1, so 0 is safe for "no series"
 # ---------------------------------------------------------------------------
 
-async def _do_prep(m, panel: list) -> None:
-    if panel[0]:
-        await panel[0].inject(_build_prep_prompt(m))
-
-
-async def _do_debrief(m, panel: list) -> None:
-    if panel[0]:
-        await panel[0].inject(_build_debrief_prompt(m))
-
-
-def _save_last_reply(meeting_id: int, field: str, notify_msg: str, panel: list) -> None:
-    p = panel[0]
-    if not p or not p.messages:
-        ui.notify("No chat output to save.", type="warning")
-        return
-    for msg in reversed(p.messages):
-        if msg["role"] == "assistant":
-            db.update_meeting(meeting_id, **{field: msg["content"]})
-            ui.notify(notify_msg)
-            return
-    ui.notify("No assistant reply to save yet.", type="warning")
-
-
-# ---------------------------------------------------------------------------
-# Status badge
-# ---------------------------------------------------------------------------
-
-def _status_badge(label: str, active: bool) -> None:
-    ui.badge(label).props(f"color={'positive' if active else 'grey-5'}")
-
-
-# ---------------------------------------------------------------------------
-# Meeting card (single row in the list view)
-# ---------------------------------------------------------------------------
-
-def _meeting_card(m, left_col, chat_container: list, panel: list) -> None:
-    has_prep = bool(m["prep_brief"] or m["prep_context"])
-    has_debrief = bool(m["debrief_summary"] or m["debrief_notes"])
-
-    def _select(mid=m["id"]):
-        left_col.clear()
-        with left_col:
-            _render_detail(mid, left_col, chat_container, panel)
-        _rewire_chat(mid, chat_container, panel)
-
-    with ui.card().classes("w-full cursor-pointer q-mb-xs").on("click", _select):
-        with ui.row().classes("w-full items-start justify-between gap-2"):
-            with ui.column().classes("gap-0"):
-                ui.label(m["title"]).classes("text-body1 text-bold")
-                ui.label(m["date"]).classes("text-caption text-grey")
-                if m["attendees"]:
-                    ui.label(m["attendees"]).classes("text-caption")
-            with ui.row().classes("gap-1 items-center"):
-                _status_badge("P", has_prep)
-                _status_badge("D", has_debrief)
-
-
-# ---------------------------------------------------------------------------
-# List view
-# ---------------------------------------------------------------------------
-
-def _render_list(left_col, chat_container: list, panel: list) -> None:
-    meetings = db.list_meetings(limit=50)
-    all_series = {s["id"]: s for s in db.list_meeting_series()}
-
-    # Group by series_id
-    buckets: dict = {}
-    for m in meetings:
-        sid = m["series_id"]
-        buckets.setdefault(sid, []).append(m)
-
-    # Sort: named series alphabetically, one-offs last
-    named_sids = sorted(
-        [sid for sid in buckets if sid is not None],
-        key=lambda sid: all_series[sid]["name"].lower(),
-    )
-
-    def _open_dialog():
-        _open_new_meeting_dialog(left_col, chat_container, panel)
-
-    with ui.row().classes("w-full items-center justify-between q-pb-sm"):
-        ui.label("Meetings").classes("text-h5")
-        ui.button("+ New Meeting", on_click=_open_dialog).props("flat dense")
-
-    if not meetings:
-        ui.label("No meetings yet.").classes("text-caption text-grey q-mt-sm")
-        return
-
-    with ui.scroll_area().classes("w-full").style("flex: 1"):
-        for sid in named_sids:
-            series_name = all_series[sid]["name"]
-            with ui.expansion(series_name, icon="group").classes("w-full"):
-                for m in buckets[sid]:
-                    _meeting_card(m, left_col, chat_container, panel)
-
-        if None in buckets:
-            ui.label("One-off meetings").classes("text-caption text-grey text-uppercase q-mt-md q-mb-xs")
-            for m in buckets[None]:
-                _meeting_card(m, left_col, chat_container, panel)
-
-
-# ---------------------------------------------------------------------------
-# Detail view
-# ---------------------------------------------------------------------------
-
-# ui.select() with {key: label} dict format — NiceGUI validates value against keys, not label strings.
-# 0 is a safe "no series" sentinel since series IDs start at 1.
 _NO_SERIES = 0
 
 
 def _series_dict(all_series) -> dict:
-    """Build {series_id: name} dict for ui.select, with 0 = no series."""
     d = {_NO_SERIES: "(none — one-off)"}
     for s in all_series:
         d[s["id"]] = s["name"]
     return d
 
 
-def _render_detail(meeting_id: int, left_col, chat_container: list, panel: list) -> None:
+# ---------------------------------------------------------------------------
+# Confirmation dialog
+# ---------------------------------------------------------------------------
+
+def _confirm_overwrite(on_confirm) -> None:
+    with ui.dialog() as dlg, ui.card():
+        ui.label("This will overwrite the existing content. Continue?").classes("text-body2")
+        with ui.row().classes("justify-end gap-2 q-mt-sm"):
+            ui.button("Cancel", on_click=dlg.close).props("flat dense")
+            ui.button("Overwrite", on_click=lambda: (dlg.close(), on_confirm())).props("color=negative dense")
+    dlg.open()
+
+
+# ---------------------------------------------------------------------------
+# AI output display helpers (read-only + Edit toggle)
+# ---------------------------------------------------------------------------
+
+def _render_brief_display(meeting_id: int, brief_container: list) -> None:
+    m = db.get_meeting(meeting_id)
+    brief_container[0].clear()
+    with brief_container[0]:
+        if m["prep_brief"]:
+            with ui.element("div").classes("bg-grey-9 rounded q-pa-sm w-full q-mb-xs"):
+                ui.markdown(m["prep_brief"]).classes("text-body2")
+        else:
+            ui.label("Not yet generated — use Prep session →").classes("text-caption text-grey q-mb-xs")
+        ui.button("Edit ✎", on_click=lambda: _show_brief_editor(meeting_id, brief_container)).props("flat dense size=sm")
+
+
+def _show_brief_editor(meeting_id: int, brief_container: list) -> None:
+    m = db.get_meeting(meeting_id)
+    brief_container[0].clear()
+    with brief_container[0]:
+        ta = ui.textarea(value=m["prep_brief"] or "").props("rows=5 outlined").classes("w-full")
+
+        def _save():
+            db.update_meeting(meeting_id, prep_brief=ta.value or None)
+            _render_brief_display(meeting_id, brief_container)
+            ui.notify("Prep brief saved.")
+
+        with ui.row().classes("gap-2 q-mt-xs"):
+            ui.button("Save", on_click=_save).props("color=primary dense size=sm")
+            ui.button("Cancel", on_click=lambda: _render_brief_display(meeting_id, brief_container)).props("flat dense size=sm")
+
+
+def _render_summary_display(meeting_id: int, summary_container: list) -> None:
+    m = db.get_meeting(meeting_id)
+    summary_container[0].clear()
+    with summary_container[0]:
+        if m["debrief_summary"]:
+            with ui.element("div").classes("bg-grey-9 rounded q-pa-sm w-full q-mb-xs"):
+                ui.markdown(m["debrief_summary"]).classes("text-body2")
+        else:
+            ui.label("Not yet generated — use Debrief session →").classes("text-caption text-grey q-mb-xs")
+        ui.button("Edit ✎", on_click=lambda: _show_summary_editor(meeting_id, summary_container)).props("flat dense size=sm")
+
+
+def _show_summary_editor(meeting_id: int, summary_container: list) -> None:
+    m = db.get_meeting(meeting_id)
+    summary_container[0].clear()
+    with summary_container[0]:
+        ta = ui.textarea(value=m["debrief_summary"] or "").props("rows=5 outlined").classes("w-full")
+
+        def _save():
+            db.update_meeting(meeting_id, debrief_summary=ta.value or None)
+            _render_summary_display(meeting_id, summary_container)
+            ui.notify("Debrief summary saved.")
+
+        with ui.row().classes("gap-2 q-mt-xs"):
+            ui.button("Save", on_click=_save).props("color=primary dense size=sm")
+            ui.button("Cancel", on_click=lambda: _render_summary_display(meeting_id, summary_container)).props("flat dense size=sm")
+
+
+# ---------------------------------------------------------------------------
+# Session tab renderers
+# ---------------------------------------------------------------------------
+
+async def _do_prep_with_save(meeting_id: int, panel: list, notes_ta) -> None:
+    db.update_meeting(meeting_id, prep_context=notes_ta.value or None)
+    m = db.get_meeting(meeting_id)
+    if panel[0]:
+        await panel[0].inject(_build_prep_prompt(m))
+
+
+async def _do_debrief_with_save(meeting_id: int, panel: list, notes_ta) -> None:
+    db.update_meeting(meeting_id, debrief_notes=notes_ta.value or None)
+    m = db.get_meeting(meeting_id)
+    if panel[0]:
+        await panel[0].inject(_build_debrief_prompt(m))
+
+
+def _save_as_brief(meeting_id: int, panel: list, brief_container: list) -> None:
+    p = panel[0]
+    if not p or not p.messages:
+        ui.notify("No chat output to save.", type="warning")
+        return
+    last_reply = next((msg["content"] for msg in reversed(p.messages) if msg["role"] == "assistant"), None)
+    if last_reply is None:
+        ui.notify("No assistant reply yet.", type="warning")
+        return
+    existing = db.get_meeting(meeting_id)["prep_brief"]
+    if existing:
+        _confirm_overwrite(lambda: _do_save_brief(meeting_id, last_reply, brief_container))
+    else:
+        _do_save_brief(meeting_id, last_reply, brief_container)
+
+
+def _do_save_brief(meeting_id: int, content: str, brief_container: list) -> None:
+    db.update_meeting(meeting_id, prep_brief=content)
+    _render_brief_display(meeting_id, brief_container)
+    ui.notify("Prep brief saved.")
+
+
+def _save_as_summary(meeting_id: int, panel: list, summary_container: list) -> None:
+    p = panel[0]
+    if not p or not p.messages:
+        ui.notify("No chat output to save.", type="warning")
+        return
+    last_reply = next((msg["content"] for msg in reversed(p.messages) if msg["role"] == "assistant"), None)
+    if last_reply is None:
+        ui.notify("No assistant reply yet.", type="warning")
+        return
+    existing = db.get_meeting(meeting_id)["debrief_summary"]
+    if existing:
+        _confirm_overwrite(lambda: _do_save_summary(meeting_id, last_reply, summary_container))
+    else:
+        _do_save_summary(meeting_id, last_reply, summary_container)
+
+
+def _do_save_summary(meeting_id: int, content: str, summary_container: list) -> None:
+    db.update_meeting(meeting_id, debrief_summary=content)
+    _render_summary_display(meeting_id, summary_container)
+    ui.notify("Debrief summary saved.")
+
+
+def _render_prep_tab(meeting_id: int, prep_panel: list, brief_container: list) -> None:
+    m = db.get_meeting(meeting_id)
+    coach_fn = coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation
+
+    ui.label("Pre-meeting notes").classes("text-caption text-grey")
+    notes_ta = ui.textarea(value=m["prep_context"] or "").props("rows=3 outlined").classes("w-full")
+
+    with ui.row().classes("w-full justify-end"):
+        ui.button(
+            "Save notes ↑",
+            on_click=lambda: (db.update_meeting(meeting_id, prep_context=notes_ta.value or None), ui.notify("Notes saved.")),
+        ).props("flat dense")
+
+    ui.separator().classes("q-my-xs")
+
+    with ui.row().classes("gap-2 items-center flex-wrap"):
+        ui.button(
+            "Generate Prep Brief",
+            on_click=lambda: asyncio.ensure_future(_do_prep_with_save(meeting_id, prep_panel, notes_ta)),
+        ).props("flat dense color=primary")
+        ui.button(
+            "Save as Prep Brief ↓",
+            on_click=lambda: _save_as_brief(meeting_id, prep_panel, brief_container),
+        ).props("flat dense")
+
+    ui.separator().classes("q-my-xs")
+
+    with ui.column().classes("w-full").style("flex: 1; min-height: 0"):
+        prep_panel[0] = ChatPanel(
+            placeholder="Follow up on prep...",
+            coach_fn=coach_fn,
+            thread_key=f"meeting-{meeting_id}-prep",
+        )
+
+
+def _render_debrief_tab(meeting_id: int, debrief_panel: list, summary_container: list) -> None:
+    m = db.get_meeting(meeting_id)
+    coach_fn = coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation
+
+    ui.label("Meeting notes").classes("text-caption text-grey")
+    notes_ta = ui.textarea(value=m["debrief_notes"] or "").props("rows=3 outlined").classes("w-full")
+
+    with ui.row().classes("w-full justify-end"):
+        ui.button(
+            "Save notes ↑",
+            on_click=lambda: (db.update_meeting(meeting_id, debrief_notes=notes_ta.value or None), ui.notify("Notes saved.")),
+        ).props("flat dense")
+
+    ui.separator().classes("q-my-xs")
+
+    with ui.row().classes("gap-2 items-center flex-wrap"):
+        ui.button(
+            "Generate Debrief Summary",
+            on_click=lambda: asyncio.ensure_future(_do_debrief_with_save(meeting_id, debrief_panel, notes_ta)),
+        ).props("flat dense color=secondary")
+        ui.button(
+            "Save as Debrief Summary ↓",
+            on_click=lambda: _save_as_summary(meeting_id, debrief_panel, summary_container),
+        ).props("flat dense")
+
+    ui.separator().classes("q-my-xs")
+
+    with ui.column().classes("w-full").style("flex: 1; min-height: 0"):
+        debrief_panel[0] = ChatPanel(
+            placeholder="Follow up on debrief...",
+            coach_fn=coach_fn,
+            thread_key=f"meeting-{meeting_id}-debrief",
+        )
+
+
+def _render_session_panel(
+    meeting_id: int,
+    initial_tab: str,
+    tabs_ref: list,
+    brief_container: list,
+    summary_container: list,
+) -> None:
+    prep_panel: list[ChatPanel | None] = [None]
+    debrief_panel: list[ChatPanel | None] = [None]
+
+    with ui.tabs().classes("w-full").style("flex-shrink: 0") as tabs:
+        ui.tab("prep", label="Prep session")
+        ui.tab("debrief", label="Debrief session")
+    tabs_ref[0] = tabs
+
+    with ui.tab_panels(tabs, value=initial_tab).classes("w-full").style("flex: 1; min-height: 0; overflow: hidden"):
+        with ui.tab_panel("prep").classes("h-full q-pa-sm").style("display: flex; flex-direction: column"):
+            _render_prep_tab(meeting_id, prep_panel, brief_container)
+        with ui.tab_panel("debrief").classes("h-full q-pa-sm").style("display: flex; flex-direction: column"):
+            _render_debrief_tab(meeting_id, debrief_panel, summary_container)
+
+
+# ---------------------------------------------------------------------------
+# Detail view — left panel
+# ---------------------------------------------------------------------------
+
+def _render_detail_left(
+    meeting_id: int,
+    tabs_ref: list,
+    brief_container: list,
+    summary_container: list,
+    main_container: list,
+) -> None:
     m = db.get_meeting(meeting_id)
     if m is None:
         ui.label("Meeting not found.").classes("text-caption text-negative")
@@ -190,121 +319,88 @@ def _render_detail(meeting_id: int, left_col, chat_container: list, panel: list)
     series_opts = _series_dict(all_series)
     current_series = m["series_id"] if m["series_id"] is not None else _NO_SERIES
 
-    # Input refs
+    def _go_back():
+        main_container[0].style("overflow-y: auto")
+        main_container[0].clear()
+        with main_container[0]:
+            _render_list(main_container)
+
+    ui.button("← Back", on_click=_go_back).props("flat dense").classes("q-mb-sm")
+
+    # --- Meeting Setup ---
     title_in = [None]
     date_in = [None]
     attendees_in = [None]
     series_in = [None]
-    prep_context_in = [None]
-    prep_brief_in = [None]
-    debrief_notes_in = [None]
-    debrief_summary_in = [None]
 
-    def _go_back():
-        left_col.clear()
-        with left_col:
-            _render_list(left_col, chat_container, panel)
-        _rewire_chat(None, chat_container, panel)
+    with ui.expansion("Meeting Setup", value=True).classes("w-full"):
+        title_in[0] = ui.input(label="Title", value=m["title"]).classes("w-full")
+        date_in[0] = ui.input(label="Date (YYYY-MM-DD)", value=m["date"]).classes("w-full")
+        attendees_in[0] = ui.input(label="Attendees", value=m["attendees"] or "").classes("w-full")
+        series_in[0] = ui.select(
+            label="Series", options=series_opts, value=current_series
+        ).classes("w-full")
 
-    def _save_meeting():
-        series_key = series_in[0].value  # int key from the {id: name} dict
-        db.update_meeting(
-            meeting_id,
-            title=title_in[0].value or m["title"],
-            date=date_in[0].value or m["date"],
-            attendees=attendees_in[0].value or None,
-            series_id=None if series_key == _NO_SERIES else series_key,
-            prep_context=prep_context_in[0].value or None,
-            prep_brief=prep_brief_in[0].value or None,
-            debrief_notes=debrief_notes_in[0].value or None,
-            debrief_summary=debrief_summary_in[0].value or None,
-        )
-        ui.notify("Saved.")
-
-    ui.button("← Back", on_click=_go_back).props("flat dense").classes("q-mb-sm")
-    ui.label(m["title"]).classes("text-h6 q-mb-xs")
-
-    title_in[0] = ui.input(label="Title", value=m["title"]).classes("w-full")
-    date_in[0] = ui.input(label="Date (YYYY-MM-DD)", value=m["date"]).classes("w-full")
-    attendees_in[0] = ui.input(label="Attendees", value=m["attendees"] or "").classes("w-full")
-    series_in[0] = ui.select(
-        label="Series",
-        options=series_opts,
-        value=current_series,
-    ).classes("w-full")
-
-    ui.separator().classes("q-my-sm")
-    prep_context_in[0] = ui.textarea(
-        label="Prep context", value=m["prep_context"] or ""
-    ).props("rows=3 outlined").classes("w-full")
-    prep_brief_in[0] = ui.textarea(
-        label="Prep brief (coach output)", value=m["prep_brief"] or ""
-    ).props("rows=4 outlined").classes("w-full")
-
-    ui.separator().classes("q-my-sm")
-    debrief_notes_in[0] = ui.textarea(
-        label="Debrief notes", value=m["debrief_notes"] or ""
-    ).props("rows=3 outlined").classes("w-full")
-    debrief_summary_in[0] = ui.textarea(
-        label="Debrief summary (coach output)", value=m["debrief_summary"] or ""
-    ).props("rows=4 outlined").classes("w-full")
-
-    ui.button("Save", on_click=_save_meeting).props("color=primary dense").classes("q-mt-sm")
-
-
-# ---------------------------------------------------------------------------
-# Chat panel (right column)
-# ---------------------------------------------------------------------------
-
-def _rewire_chat(meeting_id: int | None, chat_container: list, panel: list) -> None:
-    chat_container[0].clear()
-    with chat_container[0]:
-        if meeting_id is not None:
-            m = db.get_meeting(meeting_id)
-            if m is None:
-                panel[0] = ChatPanel(
-                    placeholder="Ask about any meeting...",
-                    coach_fn=coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation,
-                )
-                return
-
-            with ui.row().classes("q-pa-xs gap-2 items-center").style("flex-shrink: 0"):
-                ui.button(
-                    "Prep this meeting",
-                    on_click=lambda: asyncio.ensure_future(_do_prep(m, panel)),
-                ).props("flat dense color=primary")
-                ui.button(
-                    "Debrief this meeting",
-                    on_click=lambda: asyncio.ensure_future(_do_debrief(m, panel)),
-                ).props("flat dense color=secondary")
-                ui.button(
-                    "Save brief",
-                    on_click=lambda: _save_last_reply(m["id"], "prep_brief", "Prep brief saved.", panel),
-                ).props("flat dense")
-                ui.button(
-                    "Save summary",
-                    on_click=lambda: _save_last_reply(m["id"], "debrief_summary", "Debrief summary saved.", panel),
-                ).props("flat dense")
-
-            coach_fn = coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation
-            with ui.column().classes("w-full").style("flex: 1; min-height: 0"):
-                panel[0] = ChatPanel(
-                    placeholder="Follow up on this meeting...",
-                    coach_fn=coach_fn,
-                    thread_key=f"meeting-{meeting_id}",
-                )
-        else:
-            panel[0] = ChatPanel(
-                placeholder="Ask about any meeting...",
-                coach_fn=coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation,
+        def _save_setup():
+            series_key = series_in[0].value
+            db.update_meeting(
+                meeting_id,
+                title=title_in[0].value or m["title"],
+                date=date_in[0].value or m["date"],
+                attendees=attendees_in[0].value or None,
+                series_id=None if series_key == _NO_SERIES else series_key,
             )
+            ui.notify("Meeting saved.")
+
+        ui.button("Save meeting", on_click=_save_setup).props("color=primary dense").classes("q-mt-sm")
+
+    # --- Prep ---
+    with ui.expansion("Prep", value=True).classes("w-full"):
+        ui.button(
+            "Open Prep Session →",
+            on_click=lambda: tabs_ref[0].set_value("prep"),
+        ).props("flat dense color=primary").classes("q-mb-xs")
+        brief_container[0] = ui.column().classes("w-full")
+        _render_brief_display(meeting_id, brief_container)
+
+    # --- Debrief ---
+    with ui.expansion("Debrief", value=True).classes("w-full"):
+        ui.button(
+            "Open Debrief Session →",
+            on_click=lambda: tabs_ref[0].set_value("debrief"),
+        ).props("flat dense color=secondary").classes("q-mb-xs")
+        summary_container[0] = ui.column().classes("w-full")
+        _render_summary_display(meeting_id, summary_container)
+
+
+# ---------------------------------------------------------------------------
+# Open detail (switches page layout from list → two-column)
+# ---------------------------------------------------------------------------
+
+def _open_detail(meeting_id: int, initial_tab: str, main_container: list) -> None:
+    main_container[0].style("overflow: hidden")
+    main_container[0].clear()
+
+    tabs_ref: list = [None]
+    brief_container: list = [None]
+    summary_container: list = [None]
+
+    with main_container[0]:
+        with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
+            with ui.column().style(
+                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
+            ).classes("q-pa-md gap-1"):
+                _render_detail_left(meeting_id, tabs_ref, brief_container, summary_container, main_container)
+
+            with ui.column().classes("flex-1 h-full gap-0 q-pa-sm").style("display: flex; flex-direction: column"):
+                _render_session_panel(meeting_id, initial_tab, tabs_ref, brief_container, summary_container)
 
 
 # ---------------------------------------------------------------------------
 # New meeting dialog
 # ---------------------------------------------------------------------------
 
-def _open_new_meeting_dialog(left_col, chat_container: list, panel: list) -> None:
+def _open_new_meeting_dialog(main_container: list) -> None:
     today = date.today().isoformat()
     all_series = db.list_meeting_series()
     series_opts = _series_dict(all_series)
@@ -331,9 +427,10 @@ def _open_new_meeting_dialog(left_col, chat_container: list, panel: list) -> Non
                 series_id=None if series_key == _NO_SERIES else series_key,
             )
             dlg.close()
-            left_col.clear()
-            with left_col:
-                _render_list(left_col, chat_container, panel)
+            main_container[0].style("overflow-y: auto")
+            main_container[0].clear()
+            with main_container[0]:
+                _render_list(main_container)
 
         with ui.row().classes("w-full justify-end gap-2 q-mt-sm"):
             ui.button("Cancel", on_click=dlg.close).props("flat dense")
@@ -343,26 +440,134 @@ def _open_new_meeting_dialog(left_col, chat_container: list, panel: list) -> Non
 
 
 # ---------------------------------------------------------------------------
+# List view (full-width table)
+# ---------------------------------------------------------------------------
+
+def _prep_debrief_indicator(has_content: bool) -> str:
+    return "●" if has_content else "○"
+
+
+def _render_group_table(
+    meetings: list,
+    main_container: list,
+) -> None:
+    """Render one table for a group of meetings (a series or one-offs)."""
+    if not meetings:
+        return
+
+    with ui.element("table").classes("w-full").style(
+        "border-collapse: collapse; table-layout: fixed"
+    ):
+        with ui.element("thead"):
+            with ui.element("tr").style("border-bottom: 1px solid rgba(255,255,255,0.12)"):
+                for label, width in [
+                    ("Meeting", "35%"),
+                    ("Date", "15%"),
+                    ("Attendees", "30%"),
+                    ("Prep", "10%"),
+                    ("Debrief", "10%"),
+                ]:
+                    ui.element("th").classes("text-caption text-grey text-left q-pa-xs").style(
+                        f"width: {width}; font-weight: 500"
+                    ).text = label
+
+        with ui.element("tbody"):
+            for m in meetings:
+                has_prep = bool(m["prep_brief"])
+                has_debrief = bool(m["debrief_summary"])
+                mid = m["id"]
+
+                with ui.element("tr").classes("cursor-pointer").style(
+                    "border-bottom: 1px solid rgba(255,255,255,0.06)"
+                ):
+                    # Meeting name — click opens detail
+                    with ui.element("td").classes("q-pa-xs").on(
+                        "click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)
+                    ):
+                        ui.label(m["title"]).classes("text-body2 text-bold cursor-pointer")
+
+                    # Date
+                    with ui.element("td").classes("q-pa-xs").on(
+                        "click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)
+                    ):
+                        ui.label(m["date"]).classes("text-caption text-grey")
+
+                    # Attendees
+                    with ui.element("td").classes("q-pa-xs").on(
+                        "click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)
+                    ):
+                        ui.label(m["attendees"] or "—").classes("text-caption")
+
+                    # Prep column
+                    with ui.element("td").classes("q-pa-xs text-center"):
+                        with ui.row().classes("gap-1 items-center justify-center no-wrap"):
+                            ui.label(_prep_debrief_indicator(has_prep)).classes(
+                                "text-body2 " + ("text-positive" if has_prep else "text-grey-6")
+                            )
+                            ui.button(
+                                "→",
+                                on_click=lambda _mid=mid: _open_detail(_mid, "prep", main_container),
+                            ).props("flat dense size=xs")
+
+                    # Debrief column
+                    with ui.element("td").classes("q-pa-xs text-center"):
+                        with ui.row().classes("gap-1 items-center justify-center no-wrap"):
+                            ui.label(_prep_debrief_indicator(has_debrief)).classes(
+                                "text-body2 " + ("text-positive" if has_debrief else "text-grey-6")
+                            )
+                            ui.button(
+                                "→",
+                                on_click=lambda _mid=mid: _open_detail(_mid, "debrief", main_container),
+                            ).props("flat dense size=xs")
+
+
+def _render_list(main_container: list) -> None:
+    meetings = db.list_meetings(limit=50)
+    all_series = {s["id"]: s for s in db.list_meeting_series()}
+
+    # Group by series_id
+    buckets: dict = {}
+    for m in meetings:
+        sid = m["series_id"]
+        buckets.setdefault(sid, []).append(m)
+
+    named_sids = sorted(
+        [sid for sid in buckets if sid is not None],
+        key=lambda sid: all_series[sid]["name"].lower(),
+    )
+
+    with ui.row().classes("w-full items-center justify-between q-pb-sm").style("flex-shrink: 0"):
+        ui.label("Meetings").classes("text-h5")
+        ui.button(
+            "+ New Meeting",
+            on_click=lambda: _open_new_meeting_dialog(main_container),
+        ).props("flat dense")
+
+    if not meetings:
+        ui.label("No meetings yet.").classes("text-caption text-grey q-mt-sm")
+        return
+
+    with ui.scroll_area().classes("w-full").style("flex: 1"):
+        for sid in named_sids:
+            series_name = all_series[sid]["name"]
+            ui.label(series_name).classes("text-overline text-bold q-mt-md q-mb-xs")
+            _render_group_table(buckets[sid], main_container)
+
+        if None in buckets:
+            ui.label("One-off meetings").classes("text-overline text-bold q-mt-md q-mb-xs")
+            _render_group_table(buckets[None], main_container)
+
+
+# ---------------------------------------------------------------------------
 # Page entry point
 # ---------------------------------------------------------------------------
 
 @ui.page("/meetings")
 def meetings_page() -> None:
     create_nav("/meetings")
-    panel: list[ChatPanel | None] = [None]
-    chat_container: list = [None]
 
-    with ui.row().classes("w-full gap-0").style(
-        "height: calc(100vh - 56px); overflow: hidden"
-    ):
-        with ui.column().style(
-            "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
-        ).classes("q-pa-md gap-2") as left_col:
-            _render_list(left_col, chat_container, panel)
-
-        with ui.column().classes("flex-1 h-full gap-0") as right_col:
-            chat_container[0] = right_col
-            panel[0] = ChatPanel(
-                placeholder="Ask about any meeting...",
-                coach_fn=coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation,
-            )
+    with ui.column().classes("w-full q-pa-md").style(
+        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column"
+    ) as outer:
+        main_container: list = [outer]
+        _render_list(main_container)

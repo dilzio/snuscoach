@@ -1,11 +1,11 @@
-"""Playwright integration tests for the Meetings section (§6.7).
+"""Playwright integration tests for the redesigned Meetings section (§6.7).
 
-Covers: two-column layout, list view (grouped/one-offs/empty), status badges,
-detail view navigation and pre-population, Save, chat panel, Prep/Debrief
-action buttons, new-meeting dialog.
+List view: full-width table grouped by series; per-row Prep/Debrief session
+links. Detail view: three collapsible accordions (Meeting Setup, Prep,
+Debrief) on the left; tabbed Prep/Debrief session panel on the right.
 
-AI calls are expected to fail (fake API key in conftest) — tests assert on the
-user message appearing in chat, not on the AI reply.
+AI calls are expected to fail (fake API key in conftest) — tests assert on
+user messages appearing in chat, not on AI replies.
 """
 
 import sqlite3
@@ -24,21 +24,18 @@ def _goto(page: Page, url: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# DB seeding helper — idempotent (called independently by each test)
+# DB seeding helper — idempotent
 # ---------------------------------------------------------------------------
 
 def _seed_meetings(db_path: Path) -> dict:
     """Ensure the shared test DB has a series, two series meetings, and one one-off.
 
-    Uses INSERT OR IGNORE / check-then-insert to be idempotent — the session-
-    scoped server may have already seeded these rows in a prior test.
     Returns dict of IDs.
     """
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA foreign_keys = ON")
 
     try:
-        # Series — unique name constraint; ignore if already exists
         conn.execute(
             "INSERT OR IGNORE INTO meeting_series"
             " (name, description, created_at, updated_at) VALUES (?,?,?,?)",
@@ -93,16 +90,6 @@ def _seed_meetings(db_path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Helper to expand the series group in the list view
-# ---------------------------------------------------------------------------
-
-def _expand_series(page: Page) -> None:
-    """Click the 'Weekly 1:1' expansion header and wait for it to open."""
-    page.locator("text=Weekly 1:1").first.click()
-    page.wait_for_timeout(500)
-
-
-# ---------------------------------------------------------------------------
 # Basic page load
 # ---------------------------------------------------------------------------
 
@@ -111,14 +98,9 @@ def test_meetings_page_loads(page: Page, ui_base_url: str) -> None:
     expect(page.locator("text=Meetings").first).to_be_visible()
 
 
-def test_meetings_page_has_new_meeting_button(page: Page, ui_base_url: str) -> None:
+def test_new_meeting_button_visible(page: Page, ui_base_url: str) -> None:
     _goto(page, f"{ui_base_url}{MEETINGS}")
     expect(page.locator("text=+ New Meeting").first).to_be_visible()
-
-
-def test_meetings_page_has_chat_panel(page: Page, ui_base_url: str) -> None:
-    _goto(page, f"{ui_base_url}{MEETINGS}")
-    expect(page.locator("button:has-text('Send')").first).to_be_visible()
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +116,7 @@ def test_meeting_list_empty_state(page: Page, ui_base_url: str) -> None:
 # List view — with data
 # ---------------------------------------------------------------------------
 
-def test_meeting_list_shows_series_group(
+def test_list_shows_series_header(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
     _seed_meetings(ui_db_path)
@@ -142,104 +124,104 @@ def test_meeting_list_shows_series_group(
     expect(page.locator("text=Weekly 1:1").first).to_be_visible()
 
 
-def test_meeting_list_shows_one_offs_section(
+def test_list_shows_one_offs_header(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
     _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
     expect(page.locator("text=One-off meetings").first).to_be_visible()
+
+
+def test_list_shows_meeting_row(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _seed_meetings(ui_db_path)
+    _goto(page, f"{ui_base_url}{MEETINGS}")
     expect(page.locator("text=Q2 Planning").first).to_be_visible()
 
 
-def test_status_badge_prep_positive(
+def test_list_prep_indicator_filled(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    """m1 has prep_brief — P badge should be present after expanding the series."""
+    """m1 has prep_brief — ● indicator should be visible (green)."""
     _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
-    _expand_series(page)
-    expect(page.locator("text=P").first).to_be_visible()
+    # At least one filled indicator in the page
+    expect(page.locator("text=●").first).to_be_visible()
 
 
-def test_status_badge_debrief_positive(
+def test_list_debrief_indicator_filled(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    """m2 has debrief_summary — D badge should be present after expanding the series."""
+    """m2 has debrief_summary — ● indicator should be visible."""
     _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
-    _expand_series(page)
-    expect(page.locator("text=D").first).to_be_visible()
+    # m2's debrief ● is also a filled indicator
+    filled = page.locator("text=●")
+    expect(filled.first).to_be_visible()
 
 
 # ---------------------------------------------------------------------------
-# Detail view
+# Detail view — navigation
 # ---------------------------------------------------------------------------
 
-def _open_detail(page: Page, ui_db_path: Path, ui_base_url: str) -> None:
-    """Seed data, navigate, expand series, click first meeting card."""
+def _open_q2_planning(page: Page, ui_db_path: Path, ui_base_url: str) -> None:
+    """Seed, navigate, click Q2 Planning row to open detail."""
     _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
-    _expand_series(page)
+    page.locator("text=Q2 Planning").first.click()
+    page.wait_for_timeout(500)
+
+
+def _open_m1(page: Page, ui_db_path: Path, ui_base_url: str) -> None:
+    """Seed, navigate, click first '1:1 with Alice' row (m1, 2026-05-13)."""
+    _seed_meetings(ui_db_path)
+    _goto(page, f"{ui_base_url}{MEETINGS}")
     page.locator("text=1:1 with Alice").first.click()
     page.wait_for_timeout(500)
 
 
-def test_click_meeting_shows_detail_back_button(
+def test_click_meeting_name_opens_detail(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _open_detail(page, ui_db_path, ui_base_url)
+    _open_q2_planning(page, ui_db_path, ui_base_url)
     expect(page.locator("button:has-text('Back')").first).to_be_visible()
 
 
-def test_click_meeting_shows_title_field(
+def test_detail_has_meeting_setup_section(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _open_detail(page, ui_db_path, ui_base_url)
-    # Quasar QInput: label text lives inside .q-field__label
-    expect(page.locator(".q-field__label:has-text('Title')").first).to_be_visible()
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=Meeting Setup").first).to_be_visible()
 
 
-def test_detail_fields_prepopulated(
+def test_detail_setup_fields_prepopulated(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    """m1 has prep_brief set; the Prep brief textarea should hold that value."""
-    _open_detail(page, ui_db_path, ui_base_url)
-    prep_brief_ta = page.locator(
-        ".q-field:has(.q-field__label:has-text('Prep brief')) textarea"
-    )
-    expect(prep_brief_ta.first).to_have_value("prep brief: focus on Q3 goals")
+    """m1 title should appear in the Title input."""
+    _open_m1(page, ui_db_path, ui_base_url)
+    title_input = page.locator(".q-field:has(.q-field__label:has-text('Title')) input").first
+    expect(title_input).to_have_value("1:1 with Alice")
 
 
 def test_back_button_returns_to_list(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _open_detail(page, ui_db_path, ui_base_url)
+    _open_q2_planning(page, ui_db_path, ui_base_url)
     page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(500)
-    # Series heading back in view
     expect(page.locator("text=Weekly 1:1").first).to_be_visible()
-    # Back button gone
     expect(page.locator("button:has-text('Back')")).to_have_count(0)
 
 
-def test_save_button_present_in_detail(
+def test_save_setup_updates_db(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _open_detail(page, ui_db_path, ui_base_url)
-    expect(page.locator("button:has-text('Save')").first).to_be_visible()
-
-
-def test_save_updates_meeting(
-    page: Page, ui_base_url: str, ui_db_path: Path
-) -> None:
-    """Edit the title in detail view, save — DB row updated."""
-    _open_detail(page, ui_db_path, ui_base_url)
-
-    # Fill the Title QInput — .fill() clears then types
+    """Edit title in Meeting Setup, Save meeting → DB row updated."""
+    _open_m1(page, ui_db_path, ui_base_url)
     title_input = page.locator(".q-field:has(.q-field__label:has-text('Title')) input").first
     title_input.fill("1:1 with Alice UPDATED")
-
-    page.locator("button:has-text('Save')").first.click()
+    page.locator("button:has-text('Save meeting')").first.click()
     page.wait_for_timeout(500)
 
     conn = sqlite3.connect(str(ui_db_path))
@@ -251,57 +233,166 @@ def test_save_updates_meeting(
 
 
 # ---------------------------------------------------------------------------
-# Chat panel — meeting-contextual
+# Detail view — left panel sections
 # ---------------------------------------------------------------------------
 
-def test_prep_debrief_buttons_on_selection(
+def test_detail_has_prep_section(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _open_detail(page, ui_db_path, ui_base_url)
-    expect(page.locator("button:has-text('Prep this meeting')").first).to_be_visible()
-    expect(page.locator("button:has-text('Debrief this meeting')").first).to_be_visible()
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=Prep").first).to_be_visible()
 
 
-def test_save_brief_button_on_selection(
+def test_detail_has_debrief_section(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _open_detail(page, ui_db_path, ui_base_url)
-    expect(page.locator("button:has-text('Save brief')").first).to_be_visible()
-    expect(page.locator("button:has-text('Save summary')").first).to_be_visible()
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=Debrief").first).to_be_visible()
 
 
-def test_prep_button_injects_user_message(
+def test_detail_prep_brief_shows_content(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    """Clicking Prep injects a user message containing the TASK header into the chat."""
-    _open_detail(page, ui_db_path, ui_base_url)
-    page.locator("button:has-text('Prep this meeting')").first.click()
+    """m1 has prep_brief — its text should be visible in the left panel."""
+    _open_m1(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=prep brief: focus on Q3 goals").first).to_be_visible()
+
+
+def test_detail_prep_brief_placeholder_when_empty(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """m3 has no prep_brief — placeholder text should show."""
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=Not yet generated").first).to_be_visible()
+
+
+def test_open_prep_session_button_visible(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("button:has-text('Open Prep Session')").first).to_be_visible()
+
+
+def test_open_debrief_session_button_visible(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("button:has-text('Open Debrief Session')").first).to_be_visible()
+
+
+def test_edit_toggle_shows_textarea(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Click Edit ✎ on m1's prep brief — textarea should appear."""
+    _open_m1(page, ui_db_path, ui_base_url)
+    page.locator("button:has-text('Edit')").first.click()
+    page.wait_for_timeout(300)
+    # A textarea should now be visible
+    expect(page.locator("textarea").first).to_be_visible()
+
+
+# ---------------------------------------------------------------------------
+# Detail view — right panel tabs
+# ---------------------------------------------------------------------------
+
+def test_prep_tab_visible_on_detail(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=Prep session").first).to_be_visible()
+
+
+def test_debrief_tab_visible_on_detail(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=Debrief session").first).to_be_visible()
+
+
+def test_pre_meeting_notes_label_on_prep_tab(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("text=Pre-meeting notes").first).to_be_visible()
+
+
+def test_generate_prep_brief_button_visible(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("button:has-text('Generate Prep Brief')").first).to_be_visible()
+
+
+def test_save_as_prep_brief_button_visible(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    expect(page.locator("button:has-text('Save as Prep Brief')").first).to_be_visible()
+
+
+def test_generate_prep_brief_injects_message(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Clicking Generate Prep Brief injects the TASK prompt into the prep chat."""
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    page.locator("button:has-text('Generate Prep Brief')").first.click()
     expect(
         page.locator("text=TASK: Pre-meeting prep brief").first
     ).to_be_visible(timeout=8_000)
 
 
-def test_debrief_button_injects_user_message(
+def test_open_debrief_session_switches_tab(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    """Clicking Debrief injects a user message with the debrief TASK header."""
+    """Clicking Open Debrief Session → switches the right panel to the debrief tab."""
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    page.locator("button:has-text('Open Debrief Session')").first.click()
+    page.wait_for_timeout(400)
+    expect(page.locator("text=Meeting notes").first).to_be_visible()
+
+
+def test_debrief_tab_has_generate_button(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_q2_planning(page, ui_db_path, ui_base_url)
+    page.locator("text=Debrief session").first.click()
+    page.wait_for_timeout(300)
+    expect(page.locator("button:has-text('Generate Debrief Summary')").first).to_be_visible()
+
+
+def test_generate_debrief_summary_injects_message(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Clicking Generate Debrief Summary injects the TASK prompt into the debrief chat."""
     _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
-    _expand_series(page)
-    # m2 (2026-05-06) is the second card; both have title "1:1 with Alice"
+    # Click m2 which has debrief_notes set
     page.locator("text=1:1 with Alice").nth(1).click()
     page.wait_for_timeout(500)
-    page.locator("button:has-text('Debrief this meeting')").first.click()
+    page.locator("text=Debrief session").first.click()
+    page.wait_for_timeout(300)
+    page.locator("button:has-text('Generate Debrief Summary')").first.click()
     expect(
         page.locator("text=TASK: Post-meeting debrief").first
     ).to_be_visible(timeout=8_000)
 
 
-def test_chat_panel_renders_no_selection(page: Page, ui_base_url: str) -> None:
-    """Generic chat renders when no meeting is selected."""
+# ---------------------------------------------------------------------------
+# Direct session links from list view
+# ---------------------------------------------------------------------------
+
+def test_prep_arrow_opens_detail_on_prep_tab(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Clicking [→] in Prep column opens detail with Prep session tab active."""
+    _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
-    expect(page.locator("input[placeholder*='meeting']").first).to_be_visible()
-    expect(page.locator("button:has-text('Send')").first).to_be_visible()
+    # Find all → buttons and click the first one in the Prep column
+    # Each row has two → buttons (prep, debrief); first overall is the prep arrow for first meeting
+    page.locator("button:has-text('→')").first.click()
+    page.wait_for_timeout(500)
+    expect(page.locator("button:has-text('Back')").first).to_be_visible()
+    expect(page.locator("text=Pre-meeting notes").first).to_be_visible()
 
 
 # ---------------------------------------------------------------------------
@@ -331,10 +422,7 @@ def test_new_meeting_creates_and_appears(
     _goto(page, f"{ui_base_url}{MEETINGS}")
     page.locator("text=+ New Meeting").first.click()
     page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
-
-    # First input in the dialog is the Title field
     page.locator(".q-dialog input").first.fill("TestMeetingXYZ")
     page.locator(".q-dialog button:has-text('Create')").first.click()
-    # Wait for dialog to close and list to re-render
     page.wait_for_selector(".q-dialog", state="hidden", timeout=5_000)
     expect(page.locator("text=TestMeetingXYZ").first).to_be_visible(timeout=8_000)
