@@ -85,6 +85,28 @@ def _confirm_overwrite(on_confirm) -> None:
     dlg.open()
 
 
+def _confirm_delete_meeting(meeting_id: int, title: str, main_container: list) -> None:
+    with ui.dialog() as dlg, ui.card():
+        ui.label(f'Delete "{title}"?').classes("text-body2")
+        ui.label("This cannot be undone.").classes("text-caption text-grey")
+        with ui.row().classes("justify-end gap-2 q-mt-sm"):
+            ui.button("Cancel", on_click=dlg.close).props("flat dense")
+            ui.button(
+                "Delete",
+                on_click=lambda: (dlg.close(), _do_delete_meeting(meeting_id, main_container)),
+            ).props("color=negative dense")
+    dlg.open()
+
+
+def _do_delete_meeting(meeting_id: int, main_container: list) -> None:
+    db.delete_meeting(meeting_id)
+    main_container[0].style("overflow-y: auto")
+    main_container[0].clear()
+    with main_container[0]:
+        _render_list(main_container)
+    ui.notify("Meeting deleted.")
+
+
 # ---------------------------------------------------------------------------
 # AI output display helpers (read-only + Edit toggle)
 # ---------------------------------------------------------------------------
@@ -427,10 +449,12 @@ def _open_new_meeting_dialog(main_container: list) -> None:
                 series_id=None if series_key == _NO_SERIES else series_key,
             )
             dlg.close()
-            main_container[0].style("overflow-y: auto")
-            main_container[0].clear()
-            with main_container[0]:
-                _render_list(main_container)
+            def _refresh():
+                main_container[0].style("overflow-y: auto")
+                main_container[0].clear()
+                with main_container[0]:
+                    _render_list(main_container)
+            ui.timer(0, _refresh, once=True)
 
         with ui.row().classes("w-full justify-end gap-2 q-mt-sm"):
             ui.button("Cancel", on_click=dlg.close).props("flat dense")
@@ -456,16 +480,21 @@ def _render_group_table(
         return
 
     with ui.element("table").classes("w-full").style(
-        "border-collapse: collapse; table-layout: fixed"
+        "border-collapse: collapse; table-layout: fixed;"
+        "border: 1px solid rgba(255,255,255,0.18); border-radius: 4px"
     ):
         with ui.element("thead"):
-            with ui.element("tr").style("border-bottom: 1px solid rgba(255,255,255,0.12)"):
+            with ui.element("tr").style(
+                "border-bottom: 2px solid rgba(255,255,255,0.25);"
+                "background: rgba(255,255,255,0.07)"
+            ):
                 for label, width in [
-                    ("Meeting", "35%"),
-                    ("Date", "15%"),
-                    ("Attendees", "30%"),
-                    ("Prep", "10%"),
-                    ("Debrief", "10%"),
+                    ("Meeting", "32%"),
+                    ("Date", "13%"),
+                    ("Attendees", "27%"),
+                    ("Prep", "9%"),
+                    ("Debrief", "9%"),
+                    ("", "10%"),
                 ]:
                     ui.element("th").classes("text-caption text-grey text-left q-pa-xs").style(
                         f"width: {width}; font-weight: 500"
@@ -478,7 +507,7 @@ def _render_group_table(
                 mid = m["id"]
 
                 with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid rgba(255,255,255,0.06)"
+                    "border-bottom: 1px solid rgba(255,255,255,0.14)"
                 ):
                     # Meeting name — click opens detail
                     with ui.element("td").classes("q-pa-xs").on(
@@ -519,6 +548,15 @@ def _render_group_table(
                                 "→",
                                 on_click=lambda _mid=mid: _open_detail(_mid, "debrief", main_container),
                             ).props("flat dense size=xs")
+
+                    # Delete column
+                    with ui.element("td").classes("q-pa-xs text-center"):
+                        ui.button(
+                            "✕",
+                            on_click=lambda _mid=mid, _title=m["title"]: _confirm_delete_meeting(
+                                _mid, _title, main_container
+                            ),
+                        ).props("flat dense size=xs color=negative")
 
 
 def _render_list(main_container: list) -> None:

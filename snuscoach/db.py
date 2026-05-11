@@ -525,6 +525,11 @@ def get_meeting(meeting_id: int):
         ).fetchone()
 
 
+def delete_meeting(meeting_id: int) -> None:
+    with connect() as conn:
+        conn.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
+
+
 # ---- voice samples ----
 
 def add_voice_sample(content: str, description: str | None) -> int:

@@ -426,3 +426,70 @@ def test_new_meeting_creates_and_appears(
     page.locator(".q-dialog button:has-text('Create')").first.click()
     page.wait_for_selector(".q-dialog", state="hidden", timeout=5_000)
     expect(page.locator("text=TestMeetingXYZ").first).to_be_visible(timeout=8_000)
+
+
+def test_new_meeting_appears_alongside_existing(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Create a meeting when existing meetings are already shown — table refreshes."""
+    _seed_meetings(ui_db_path)
+    _goto(page, f"{ui_base_url}{MEETINGS}")
+    page.locator("text=+ New Meeting").first.click()
+    page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
+    page.locator(".q-dialog input").first.fill("RefreshRegressionMeeting")
+    page.locator(".q-dialog button:has-text('Create')").first.click()
+    page.wait_for_selector(".q-dialog", state="hidden", timeout=5_000)
+    expect(page.locator("text=RefreshRegressionMeeting").first).to_be_visible(timeout=8_000)
+    # Existing meetings still present
+    expect(page.locator("text=Q2 Planning").first).to_be_visible()
+
+
+# ---------------------------------------------------------------------------
+# Delete meeting
+# ---------------------------------------------------------------------------
+
+def test_delete_button_visible_in_row(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Each meeting row has a ✕ delete button."""
+    _seed_meetings(ui_db_path)
+    _goto(page, f"{ui_base_url}{MEETINGS}")
+    expect(page.locator("button:has-text('✕')").first).to_be_visible()
+
+
+def test_delete_shows_confirmation_dialog(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Clicking ✕ opens a confirmation dialog."""
+    _seed_meetings(ui_db_path)
+    _goto(page, f"{ui_base_url}{MEETINGS}")
+    page.locator("button:has-text('✕')").first.click()
+    page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
+    expect(page.locator(".q-dialog").locator("text=Delete").first).to_be_visible()
+
+
+def test_delete_cancel_keeps_meeting(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Cancelling the delete dialog leaves the meeting in the list."""
+    _seed_meetings(ui_db_path)
+    _goto(page, f"{ui_base_url}{MEETINGS}")
+    page.locator("button:has-text('✕')").last.click()
+    page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
+    page.locator(".q-dialog button:has-text('Cancel')").first.click()
+    page.wait_for_timeout(400)
+    expect(page.locator("text=Q2 Planning").first).to_be_visible()
+
+
+def test_delete_confirm_removes_meeting(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    """Confirming delete removes the meeting from the list."""
+    _seed_meetings(ui_db_path)
+    _goto(page, f"{ui_base_url}{MEETINGS}")
+    # Q2 Planning is the one-off — last ✕ button on the page
+    page.locator("button:has-text('✕')").last.click()
+    page.wait_for_selector(".q-dialog", state="visible", timeout=5_000)
+    page.locator(".q-dialog button:has-text('Delete')").first.click()
+    page.wait_for_timeout(800)
+    expect(page.locator("text=Q2 Planning")).to_have_count(0)
