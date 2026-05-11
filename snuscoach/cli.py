@@ -304,7 +304,8 @@ def cmd_post_draft(_args):
         2. A short coda: who else should see this, what to drop or shorten if I want a tighter version, and what the political move is here.
         """
     ).strip()
-    _, draft_output = _iterate_with_followups(user_msg, coach_fn=coach.draft)
+    _coach = coach.stub_fn("POST_DRAFT") if coach.is_stubbed("POST_DRAFT") else coach.draft
+    _, draft_output = _iterate_with_followups(user_msg, coach_fn=_coach)
 
     print()
     answer = input("Did you publish this? Save to history? [y/N]: ").strip().lower()
@@ -572,7 +573,8 @@ def cmd_meeting_prep(args):
         If you need information you don't have (about a stakeholder, the work, the org dynamics), ASK rather than guess.
         """
     ).strip()
-    messages, _ = _iterate_with_followups(user_msg)
+    _coach = coach.stub_fn("MEETING_PREP") if coach.is_stubbed("MEETING_PREP") else coach.conversation
+    messages, _ = _iterate_with_followups(user_msg, coach_fn=_coach)
     brief = _format_session_transcript(messages)
 
     print()
@@ -638,7 +640,8 @@ def cmd_meeting_debrief(args):
         Push back if my read of the meeting is naive or self-serving — don't validate by default.
         """
     ).strip()
-    messages, _ = _iterate_with_followups(user_msg)
+    _coach = coach.stub_fn("MEETING_DEBRIEF") if coach.is_stubbed("MEETING_DEBRIEF") else coach.conversation
+    messages, _ = _iterate_with_followups(user_msg, coach_fn=_coach)
     summary = _format_session_transcript(messages)
 
     print()
@@ -896,6 +899,7 @@ def cmd_profile_show(args):
 
 def cmd_chat(_args):
     print("Open coaching chat. Type 'exit' or Ctrl-D to quit.\n")
+    _coach = coach.stub_fn("CHAT") if coach.is_stubbed("CHAT") else coach.conversation
     messages: list[dict] = []
     while True:
         try:
@@ -909,7 +913,7 @@ def cmd_chat(_args):
             break
         messages.append({"role": "user", "content": user_input})
         print("coach> ", end="", flush=True)
-        reply = coach.conversation(messages)
+        reply = _coach(messages)
         messages.append({"role": "assistant", "content": reply})
         print()
 
@@ -930,7 +934,8 @@ def cmd_reflect(args):
     user_msg = prompts.reflect_prompt(since_date)
     messages = [{"role": "user", "content": user_msg}]
     print("coach> ", end="", flush=True)
-    brief = coach.conversation(messages)
+    _coach = coach.stub_fn("REFLECT") if coach.is_stubbed("REFLECT") else coach.conversation
+    brief = _coach(messages)
 
     print()
     answer = input("Save this reflection? [Y/n]: ").strip().lower()
@@ -1013,7 +1018,8 @@ def _format_transcript(messages: list[dict], skip_first: int = 1) -> str:
 def cmd_journal(_args):
     print("Daily journal check-in.\n")
     opening_msg = prompts.journal_opening_prompt()
-    messages, _ = _iterate_with_followups(opening_msg, coach_fn=coach.draft)
+    _coach = coach.stub_fn("JOURNAL") if coach.is_stubbed("JOURNAL") else coach.draft
+    messages, _ = _iterate_with_followups(opening_msg, coach_fn=_coach)
 
     # messages[0] = task prompt (user), messages[1] = coach opening (assistant),
     # messages[2..] = alternating user/assistant turns
@@ -1059,7 +1065,8 @@ def cmd_nudge(_args):
 def _nudge_interactive(gaps: dict) -> None:
     print("Nudge: coach-initiated update check.\n")
     nudge_prompt = prompts.nudge_analysis_prompt(gaps, mode="interactive")
-    messages, _ = _iterate_with_followups(nudge_prompt, coach_fn=coach.conversation)
+    _coach = coach.stub_fn("NUDGE_INTERACTIVE") if coach.is_stubbed("NUDGE_INTERACTIVE") else coach.conversation
+    messages, _ = _iterate_with_followups(nudge_prompt, coach_fn=_coach)
 
     print()
     answer = input("Save this nudge session? [Y/n]: ").strip().lower()
@@ -1107,7 +1114,8 @@ def _nudge_report(gaps: dict) -> None:
     nudge_prompt = prompts.nudge_analysis_prompt(gaps, mode="report")
     messages = [{"role": "user", "content": nudge_prompt}]
     print("coach> ", end="", flush=True)
-    report = coach.draft(messages)
+    _coach = coach.stub_fn("NUDGE_REPORT") if coach.is_stubbed("NUDGE_REPORT") else coach.draft
+    report = _coach(messages)
     try:
         db.add_nudge(today, report, json.dumps(gaps))
     except Exception:
@@ -1136,6 +1144,24 @@ def _nudge_report(gaps: dict) -> None:
 
     gap_summary = "\n".join(f"- {desc}" for desc, _ in items)
     db.add_journal_entry(gap_summary, coach_prompt=nudge_prompt, entry_type="nudge")
+
+
+# ---------------------------------------------------------------------------
+# Purge canned responses
+# ---------------------------------------------------------------------------
+
+
+def cmd_purge_stubs(_args):
+    counts = db.purge_canned_responses()
+    total = sum(counts.values())
+    if total == 0:
+        print("No canned responses found in the database.")
+        return
+    print("Purged canned responses:")
+    for key, n in counts.items():
+        if n:
+            print(f"  {key.replace('_', ' ')}: {n}")
+    print(f"\nTotal: {total} row(s) affected.")
 
 
 # ---------------------------------------------------------------------------
@@ -1337,6 +1363,11 @@ def main():
              "(mode: SNUSCOACH_NUDGE_MODE=interactive|report)",
     ).set_defaults(func=cmd_nudge)
 
+    sub.add_parser(
+        "purge-stubs",
+        help="Delete all canned/stub LLM responses from the database",
+    ).set_defaults(func=cmd_purge_stubs)
+
     args = parser.parse_args()
     logger.set_command(_command_path(args))
     if getattr(args, "func", None) not in _PROFILE_CHECK_SKIP:
@@ -1359,6 +1390,7 @@ _PROFILE_CHECK_SKIP = frozenset({
     cmd_profile_create,
     cmd_profile_list,
     cmd_profile_show,
+    cmd_purge_stubs,
 })
 
 
