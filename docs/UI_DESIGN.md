@@ -103,43 +103,99 @@ The left nav is always visible. Each entry maps to a top-level NiceGUI page rout
 
 **Route:** `/meetings`
 
-**Layout:** Two-column. Left data panel (~40%) + right chat panel (~60%).
+**Layout:** List view is full-width (single column, no chat panel). Detail view is two-column: left data panel (~40%) + right session panel (~60%).
+
+**Screen A — List view (default, no meeting selected):**
+
+```
+┌────────┬──────────────────────────────────────────────────────────────────┐
+│  nav   │  Meetings                                       [+ New Meeting]  │
+│        │                                                                  │
+│        │  WEEKLY 1:1                                                      │
+│        │  ┌──────────────────┬────────────┬──────────────┬───────────────┐│
+│        │  │ Meeting          │ Date       │ Attendees    │ Prep  Debrief ││
+│        │  ├──────────────────┼────────────┼──────────────┼───────────────┤│
+│        │  │ 1:1 with Alice   │ 2026-05-13 │ Alice, Bob   │ ●[→]   ○[→]  ││
+│        │  │ 1:1 with Alice   │ 2026-05-06 │ Alice        │ ○[→]   ●[→]  ││
+│        │  └──────────────────┴────────────┴──────────────┴───────────────┘│
+│        │                                                                  │
+│        │  ONE-OFFS                                                        │
+│        │  ┌──────────────────┬────────────┬──────────────┬───────────────┐│
+│        │  │ Meeting          │ Date       │ Attendees    │ Prep  Debrief ││
+│        │  ├──────────────────┼────────────┼──────────────┼───────────────┤│
+│        │  │ Q2 Planning      │ 2026-05-10 │ Team         │ ○[→]   ○[→]  ││
+│        │  └──────────────────┴────────────┴──────────────┴───────────────┘│
+└────────┴──────────────────────────────────────────────────────────────────┘
+```
+
+● = session content exists · ○ = not yet generated · [→] opens that session directly
+
+**Screen B — Detail view (meeting selected):**
 
 ```
 ┌────────┬──────────────────────┬──────────────────────────────┐
-│  nav   │  Meetings list       │  Contextual chat             │
+│  nav   │  ← Back              │  [Prep session ●][Debrief]   │
+│        │                      ├──────────────────────────────┤
+│        │  ── Meeting Setup ── │  Pre-meeting notes           │
+│        │  Title [1:1 w/ Alice]│  [                         ] │
+│        │  Date  [2026-05-13 ] │  [                         ] │
+│        │  Att.  [Alice, Bob  ]│  [                (3 rows)] │
+│        │  Series[Weekly 1:1 ▼]│                [Save notes ↑]│
+│        │           [Save ↑]   │  ────────────────────────── │
+│        │                      │  [Generate Prep Brief]       │
+│        │  ── Prep ──────────  │  [Save as Prep Brief ↓]     │
+│        │  [Open Prep Session→]│  ────────────────────────── │
+│        │  ╔══════════════════╗│  Coach: Top 3 outcomes…      │
+│        │  ║focus on Q3 goals ║│                              │
+│        │  ╚══════════════════╝│  You: What if she pushes…   │
+│        │  AI · read-only [✎] │  Coach: Good question…       │
 │        │                      │                              │
-│        │  SERIES              │  [Prep this meeting]         │
-│        │  ┌────────────────┐  │  [Debrief this meeting]      │
-│        │  │ 1:1 w/ Alice   │  │  ──────────────────────      │
-│        │  │ next: Tue      │  │                              │
-│        │  │ [prep✓][deb✗] │  │  Chat pre-seeded with        │
-│        │  └────────────────┘  │  selected meeting context    │
-│        │  ┌────────────────┐  │                              │
-│        │  │ Staff meeting  │  │                              │
-│        │  └────────────────┘  │                              │
-│        │  ONE-OFFS             │  [______________________]    │
-│        │  ┌────────────────┐  │  [Send]                      │
-│        │  │ Q2 planning    │  │                              │
-│        │  └────────────────┘  │                              │
-│        │  [+ New Meeting]      │                              │
+│        │  ── Debrief ───────  │                              │
+│        │  [Open Debrief Sess→]│                              │
+│        │  ╔══════════════════╗│                              │
+│        │  ║(not yet generated║│  [______________________]    │
+│        │  ╚══════════════════╝│  [Send]                      │
+│        │  AI · read-only [✎] │                              │
 └────────┴──────────────────────┴──────────────────────────────┘
 ```
 
-**Data panel (left):**
-- Meetings grouped by series, then one-offs (mirrors context block rendering in `prompts.py`)
-- Each meeting card shows: title, date, attendees summary, status badges (prep: ✓/✗, debrief: ✓/✗)
-- Clicking a meeting card loads its detail view inline (replaces the list, with a ← back link)
-- Detail view: all 8 editable fields (title, series, attendees, date, prep context, prep brief, debrief notes, debrief summary); inline editing with a [Save] button per field or a single [Save all] button
-- [+ New Meeting] opens a dialog with title, date, attendees, and optional series fields
+**List view (full-width, default):**
+- Full-width table; no chat panel in this mode
+- Meetings grouped by series (alphabetical), then one-offs; each group has a bold section header and its own table
+- Columns: Meeting name, Date, Attendees, Prep, Debrief
+- Prep and Debrief columns each show a filled dot (●, content exists) or empty dot (○, not yet generated), plus a [→] link that opens the detail view with that session tab active
+- Clicking a meeting name row opens the detail view (Screen B); ← Back returns to the list
+- [+ New Meeting] opens a dialog — title (required), date, attendees, optional series
 
-**Chat panel (right):**
-- When no meeting is selected: generic coaching chat with full context
-- When a meeting is selected: chat is pre-seeded with that meeting's title, date, attendees, and any existing prep context / debrief notes
-- [Prep this meeting] button above chat: injects a prep prompt and triggers the first AI turn
-- [Debrief this meeting] button: injects a debrief prompt and triggers the first AI turn
-- Maps to `coach.conversation()` (Opus)
-- After a prep or debrief session, a [Save brief / Save summary] button lets the user persist the coach's output back to the meeting record
+**Detail view (left, when meeting selected):**
+
+Three named sections; no ambiguity about what the user owns vs. what the AI produces.
+
+*Meeting Setup* — user-owned fields: Title, Date, Attendees, Series. Single [Save meeting] button. Nothing prep- or debrief-related lives here.
+
+*Prep* — shows the AI-generated Prep Brief as styled read-only markdown. Placeholder "Use the Prep session →" if not yet generated. [Open Prep Session →] button switches the right panel to the Prep tab. [Edit ✎] link converts the display to an editable textarea for intentional manual overrides.
+
+*Debrief* — same structure: read-only Debrief Summary with placeholder, [Open Debrief Session →] button, [Edit ✎] link.
+
+**Session panel (right):**
+
+Two tabs — Prep session and Debrief session. The [Open Prep Session →] / [Open Debrief Session →] buttons on the left activate the corresponding tab. Each tab has an independent chat thread (`meeting-{id}-prep` / `meeting-{id}-debrief`).
+
+*Prep tab:*
+- "Pre-meeting notes" textarea (the user's agenda / context going *into* the meeting) + [Save notes ↑]
+- [Generate Prep Brief] — injects the prep prompt and fires the first AI turn
+- [Save as Prep Brief ↓] — persists the last assistant reply to `prep_brief`; prompts confirmation if overwriting existing content; left panel Prep Brief display refreshes
+- Full chat history for this meeting's prep session; chat input pinned at bottom
+
+*Debrief tab:*
+- "Meeting notes" textarea (raw notes on what happened) + [Save notes ↑]
+- [Generate Debrief Summary] — injects the debrief prompt
+- [Save as Debrief Summary ↓] — persists to `debrief_summary`; confirmation if overwriting; left panel refreshes
+- Full chat history for this meeting's debrief session
+
+*No meeting selected:* generic coaching chat with no tabs.
+
+Maps to `coach.conversation()` (Opus) for all session chat.
 
 ---
 
