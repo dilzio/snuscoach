@@ -336,6 +336,11 @@ def update_stakeholder(name: str, **fields) -> None:
         conn.execute(f"UPDATE stakeholders SET {', '.join(sets)} WHERE name = ?", args)
 
 
+def delete_stakeholder(stakeholder_id: int) -> None:
+    with connect() as conn:
+        conn.execute("DELETE FROM stakeholders WHERE id = ?", (stakeholder_id,))
+
+
 # ---- wins ----
 
 def add_win(title: str, description: str | None) -> int:
