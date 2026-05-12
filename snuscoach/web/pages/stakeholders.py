@@ -113,8 +113,9 @@ def _render_notes_section(stakeholder_name: str, notes_container: list) -> None:
                 existing = s["notes"] or ""
                 updated = f"[{today}] {text}\n{existing}".strip()
                 db.update_stakeholder(_name, notes=updated)
-                _render_notes_section(_name, notes_container)
+                # notify before re-render: clear() destroys this button's parent element
                 ui.notify("Note added.")
+                _render_notes_section(_name, notes_container)
 
             with ui.row().classes("gap-2 q-mt-xs"):
                 ui.button("Save", on_click=_save_note).props("color=primary dense size=sm")
