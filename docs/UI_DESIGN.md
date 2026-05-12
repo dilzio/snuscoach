@@ -203,37 +203,122 @@ Maps to `coach.conversation()` (Opus) for all session chat.
 
 **Route:** `/stakeholders`
 
-**Layout:** Two-column. Left data panel (~40%) + right chat panel (~60%).
+**Layout:** List view is full-width (single column, no chat panel). Detail view is two-column: left data panel (~40%) + right chat panel (~60%).
+
+**Screen A — List view (default, no stakeholder selected):**
 
 ```
-┌────────┬──────────────────────┬──────────────────────────────┐
-│  nav   │  Stakeholders        │  Contextual chat             │
-│        │                      │                              │
-│        │  MANAGER             │  [Selected: Alice — Manager] │
-│        │  • Alice (VP Eng)    │                              │
-│        │  SKIP                │  Chat pre-seeded with        │
-│        │  • Bob (CTO)         │  Alice's full profile        │
-│        │  PEER                │                              │
-│        │  • Carol             │  You: How should I frame     │
-│        │  • Dave              │  the X project to her?       │
-│        │                      │  Coach: Given she rewards... │
-│        │  [+ Add Stakeholder] │                              │
-│        │                      │  [______________________]    │
-│        │                      │  [Send]                      │
-└────────┴──────────────────────┴──────────────────────────────┘
+┌────────┬──────────────────────────────────────────────────────────────┐
+│  nav   │  Stakeholders                            [+ New Stakeholder] │
+│        │                                                               │
+│        │  MANAGER                                                      │
+│        │  ┌──────────────────┬──────────────────┬────────────────┐   │
+│        │  │ Name             │ Role             │ Last Note      │   │
+│        │  ├──────────────────┼──────────────────┼────────────────┤   │
+│        │  │ Alice            │ VP Engineering   │ 2026-05-01     │   │
+│        │  └──────────────────┴──────────────────┴────────────────┘   │
+│        │                                                               │
+│        │  SKIP                                                         │
+│        │  ┌──────────────────┬──────────────────┬────────────────┐   │
+│        │  │ Name             │ Role             │ Last Note      │   │
+│        │  ├──────────────────┼──────────────────┼────────────────┤   │
+│        │  │ Bob              │ CTO              │ 2026-04-28     │   │
+│        │  └──────────────────┴──────────────────┴────────────────┘   │
+│        │                                                               │
+│        │  PEER                                                         │
+│        │  ┌──────────────────┬──────────────────┬────────────────┐   │
+│        │  │ Name             │ Role             │ Last Note      │   │
+│        │  ├──────────────────┼──────────────────┼────────────────┤   │
+│        │  │ Carol            │ Staff Engineer   │ —              │   │
+│        │  │ Dave             │ Engineering Mgr  │ 2026-05-10     │   │
+│        │  └──────────────────┴──────────────────┴────────────────┘   │
+└────────┴──────────────────────────────────────────────────────────────┘
 ```
 
-**Data panel (left):**
-- Stakeholders listed and grouped by `VALID_TIERS` (manager → skip → peer → cross-functional → influencer → direct-report → other)
-- Each entry shows name and role; clicking loads the detail view inline
-- Detail view: all stakeholder fields (role, relationship, communication style, what they reward, notes); inline editing; [Save] button
-- Notes rendered as a dated log (newest entry at top); [Add Note] button appends a new dated observation
-- [+ Add Stakeholder] button opens a dialog with all intake fields
+**List view behaviour:**
+- Full-width scrollable page; no chat panel in this mode.
+- Stakeholders grouped by tier in `VALID_TIERS` order: manager → skip → peer → cross-functional → influencer → direct-report → other. Only non-empty tiers rendered.
+- Each tier is a bold section header followed by a table.
+- Columns: Name, Role, Last Note date. "Last Note date" = the most recent `[YYYY-MM-DD]` prefix extracted from the notes field; `—` if no notes exist.
+- Clicking any row opens the detail view (Screen B). ← Back returns to the list.
+- [+ New Stakeholder] opens a dialog — name (required), role, tier (select from VALID_TIERS), communication style, what they reward, optional initial note.
 
-**Chat panel (right):**
-- When no stakeholder selected: generic coaching chat
-- When a stakeholder is selected: chat pre-seeded with that person's full profile block (role, tier, comm style, what they reward, notes history)
-- Maps to `coach.conversation()` (Opus)
+**Screen B — Detail view (stakeholder selected):**
+
+```
+┌────────┬──────────────────────────┬──────────────────────────────┐
+│  nav   │  ← Back                  │  [Chat: Alice]               │
+│        │                          ├──────────────────────────────┤
+│        │  ── Profile ───────────  │                              │
+│        │  Name  Alice             │  Coach: Alice rewards        │
+│        │  Role  [VP Engineering ] │  delivering visible wins.    │
+│        │  Tier  [manager       ▼]│  What's on your mind?        │
+│        │  Comm  [Direct, data-  ] │                              │
+│        │        [driven feedback] │  You: How do I frame the     │
+│        │  Rwrd  [Outcomes and   ] │  X project to her?           │
+│        │        [visibility     ] │                              │
+│        │                 [Save ↑] │  Coach: Given Alice's        │
+│        │                          │  focus on outcomes...        │
+│        │  ── Notes ─────────────  │                              │
+│        │                   [+ Add]│  [______________________]    │
+│        │  ┌────────────────────┐  │  [Send]                      │
+│        │  │ 2026-05-01         │  │                              │
+│        │  │ Seemed stressed    │  │                              │
+│        │  │ about Q3 goals     │  │                              │
+│        │  ├────────────────────┤  │                              │
+│        │  │ 2026-04-15         │  │                              │
+│        │  │ Strong reaction to │  │                              │
+│        │  │ headcount request  │  │                              │
+│        │  └────────────────────┘  │                              │
+│        │                          │                              │
+│        │           [Delete ✕]     │                              │
+└────────┴──────────────────────────┴──────────────────────────────┘
+```
+
+**Detail view — left panel:**
+
+*Profile section* — user-editable fields:
+- **Name**: displayed as read-only text (it is the unique key; renaming not supported).
+- **Role**: text input.
+- **Tier**: select dropdown from `VALID_TIERS` values.
+- **Communication style**: textarea (multi-line).
+- **What they reward**: textarea (multi-line).
+- Single [Save ↑] button below all fields calls `db.update_stakeholder()`.
+
+*Notes section* — append-only dated log:
+- Displays each dated observation as a card (date label + text below), newest entry first, in a scrollable area.
+- Notes are parsed from the `notes` field by splitting on `[YYYY-MM-DD]` prefixes.
+- [+ Add] button opens an inline single-line input field + [Save] that prepends `[TODAY] {observation}` to the notes field via `db.update_stakeholder(name, notes=...)`.
+- The log is read-only; no editing of individual entries.
+
+*Delete zone* — at the bottom of the left panel:
+- [Delete ✕] button. Opens a confirmation dialog: `"Delete {name}? This cannot be undone."` with [Cancel] / [Delete] buttons.
+- On confirm: calls `db.delete_stakeholder(id)` (new function required in db.py) and returns to the list view.
+
+**Detail view — right panel (chat):**
+- Chat header shows the selected stakeholder's name as a label.
+- Thread persists across sessions using thread key `stakeholder-{id}`.
+- On first open (no prior messages): chat pre-seeded with the stakeholder's full profile block (role, tier, comm style, what they reward, full notes history); coach responds with a contextual opening message.
+- Subsequent opens: loads and displays the existing saved thread history.
+- Maps to `coach.conversation()` (Opus).
+
+**CRUD Workflow:**
+
+| Operation | Trigger | Function |
+|---|---|---|
+| Create | [+ New Stakeholder] → dialog → [Create] | `db.add_stakeholder()` |
+| Read (list) | Page load | `db.list_stakeholders()` |
+| Read (detail) | Click row | `db.get_stakeholder(name)` |
+| Update (profile) | Edit fields → [Save ↑] | `db.update_stakeholder(name, **fields)` |
+| Update (note) | [+ Add] → input → [Save] | `db.update_stakeholder(name, notes=prepended)` |
+| Delete | [Delete ✕] → confirm | `db.delete_stakeholder(id)` *(new)* |
+
+**Chat Workflow:**
+- Pre-loaded context: stakeholder's full profile block, identical to what the CLI coaching session sees.
+- Thread key `stakeholder-{id}` means chat history persists across page loads and sessions.
+- On first open with no history: auto-seeds an opener so the chat is live on arrival, not blank.
+- When no stakeholder is selected: generic coaching chat with no stakeholder context and no thread persistence.
+- Maps to `coach.conversation()` (Opus).
 
 ---
 
