@@ -168,10 +168,11 @@ def _render_detail_left(
     ui.label(s["name"]).classes("text-subtitle1 text-bold q-mb-xs")
 
     role_in = ui.input(label="Role", value=s["role"] or "").classes("w-full")
+    rel = s["relationship"]
     tier_in = ui.select(
         label="Tier",
         options=_TIER_OPTIONS,
-        value=s["relationship"] or None,
+        value=rel if rel in _TIER_OPTIONS else None,
     ).classes("w-full")
     comm_in = ui.textarea(
         label="Communication style",
