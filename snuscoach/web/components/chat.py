@@ -135,3 +135,8 @@ class ChatPanel:
             return
         self.input.value = text
         await self._on_send()
+
+    async def inject(self, text: str) -> None:
+        """Inject a user message unconditionally, bypassing the seed guard."""
+        self.input.value = text
+        await self._on_send()

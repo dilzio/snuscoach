@@ -39,8 +39,9 @@ def test_nudge_card_resolves(page: Page, ui_base_url: str) -> None:
     # Wait for spinner to go away (AI call completes or hits error handler)
     page.wait_for_selector(".q-spinner", state="hidden", timeout=20_000)
     # Either the report markdown or the error fallback label should be present
-    content = page.locator("text=Nudge unavailable").or_(page.locator(".q-markdown"))
-    expect(content.first).to_be_visible()
+    expect(
+        page.get_by_role("button", name="Open in chat ▸")
+    ).to_be_visible()
 
 
 def test_upcoming_meetings_card_renders(page: Page, ui_base_url: str) -> None:
@@ -197,11 +198,11 @@ def test_open_in_chat_does_not_reseed_on_repeat(
     page.wait_for_selector(".q-spinner", state="hidden", timeout=20_000)
 
     # Click once — nudge text seeds into chat
-    page.locator("button:has-text('Open in chat')").first.click()
+    page.get_by_role("button", name="Open in chat ▸").first.click()
     page.wait_for_timeout(500)  # let the async seed() complete
 
     # Click again — should be a no-op (seed() guard fires)
-    page.locator("button:has-text('Open in chat')").first.click()
+    page.get_by_role("button", name="Open in chat ▸").first.click()
     page.wait_for_timeout(500)
 
     # Nudge text should appear exactly once in the chat
