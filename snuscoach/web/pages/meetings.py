@@ -140,8 +140,8 @@ def _render_brief_display(meeting_id: int, brief_container: list) -> None:
     brief_container[0].clear()
     with brief_container[0]:
         if m["prep_brief"]:
-            with ui.element("div").classes("bg-grey-9 rounded q-pa-sm w-full q-mb-xs"):
-                ui.markdown(m["prep_brief"]).classes("text-body2")
+                with ui.element("div").classes("outline-2 rounded q-pa-sm w-full q-mb-xs").style("color: black"):
+                    ui.markdown(m["prep_brief"]).classes("text-body2")
         else:
             ui.label("Not yet generated — use Prep session →").classes("text-caption text-grey q-mb-xs")
         ui.button("Edit ✎", on_click=lambda: _show_brief_editor(meeting_id, brief_container)).props("flat dense size=sm")
@@ -168,7 +168,7 @@ def _render_summary_display(meeting_id: int, summary_container: list) -> None:
     summary_container[0].clear()
     with summary_container[0]:
         if m["debrief_summary"]:
-            with ui.element("div").classes("bg-grey-9 rounded q-pa-sm w-full q-mb-xs"):
+            with ui.element("div").classes("outline-2 rounded q-pa-sm w-full q-mb-xs"):
                 ui.markdown(m["debrief_summary"]).classes("text-body2")
         else:
             ui.label("Not yet generated — use Debrief session →").classes("text-caption text-grey q-mb-xs")
@@ -406,20 +406,12 @@ def _render_detail_left(
 
     # --- Prep ---
     with ui.expansion("Prep", value=True).classes("w-full"):
-        ui.button(
-            "Open Prep Session →",
-            on_click=lambda: tabs_ref[0].set_value("prep"),
-        ).props("flat dense color=primary").classes("q-mb-xs")
-        brief_container[0] = ui.column().classes("w-full")
+        brief_container[0] = ui.column().classes("w-full bordered rounded q-pa-sm")
         _render_brief_display(meeting_id, brief_container)
 
     # --- Debrief ---
     with ui.expansion("Debrief", value=True).classes("w-full"):
-        ui.button(
-            "Open Debrief Session →",
-            on_click=lambda: tabs_ref[0].set_value("debrief"),
-        ).props("flat dense color=secondary").classes("q-mb-xs")
-        summary_container[0] = ui.column().classes("w-full")
+        summary_container[0] = ui.column().classes("w-full bordered rounded q-pa-sm")
         _render_summary_display(meeting_id, summary_container)
 
 

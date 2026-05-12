@@ -265,21 +265,6 @@ def test_detail_prep_brief_placeholder_when_empty(
     _open_q2_planning(page, ui_db_path, ui_base_url)
     expect(page.locator("text=Not yet generated").first).to_be_visible()
 
-
-def test_open_prep_session_button_visible(
-    page: Page, ui_base_url: str, ui_db_path: Path
-) -> None:
-    _open_q2_planning(page, ui_db_path, ui_base_url)
-    expect(page.locator("button:has-text('Open Prep Session')").first).to_be_visible()
-
-
-def test_open_debrief_session_button_visible(
-    page: Page, ui_base_url: str, ui_db_path: Path
-) -> None:
-    _open_q2_planning(page, ui_db_path, ui_base_url)
-    expect(page.locator("button:has-text('Open Debrief Session')").first).to_be_visible()
-
-
 def test_edit_toggle_shows_textarea(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
@@ -340,26 +325,6 @@ def test_generate_prep_brief_injects_message(
         page.locator("text=TASK: Pre-meeting prep brief").first
     ).to_be_visible(timeout=8_000)
 
-
-def test_open_debrief_session_switches_tab(
-    page: Page, ui_base_url: str, ui_db_path: Path
-) -> None:
-    """Clicking Open Debrief Session → switches the right panel to the debrief tab."""
-    _open_q2_planning(page, ui_db_path, ui_base_url)
-    page.locator("button:has-text('Open Debrief Session')").first.click()
-    page.wait_for_timeout(400)
-    expect(page.locator("text=Meeting notes").first).to_be_visible()
-
-
-def test_debrief_tab_has_generate_button(
-    page: Page, ui_base_url: str, ui_db_path: Path
-) -> None:
-    _open_q2_planning(page, ui_db_path, ui_base_url)
-    page.locator("text=Debrief session").first.click()
-    page.wait_for_timeout(300)
-    expect(page.locator("button:has-text('Generate Debrief Summary')").first).to_be_visible()
-
-
 def test_generate_debrief_summary_injects_message(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
@@ -369,7 +334,7 @@ def test_generate_debrief_summary_injects_message(
     # Click m2 which has debrief_notes set
     page.locator("text=1:1 with Alice").nth(1).click()
     page.wait_for_timeout(500)
-    page.locator("text=Debrief session").first.click()
+    page.get_by_role("tab", name="Debrief session").click()
     page.wait_for_timeout(300)
     page.locator("button:has-text('Generate Debrief Summary')").first.click()
     expect(

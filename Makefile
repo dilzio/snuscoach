@@ -270,8 +270,8 @@ purge-stubs:  ## Remove all canned/stub LLM responses from the database
 test:  ## Run the unit/integration test suite (excludes UI browser tests)
 	.venv/bin/pytest -m "not ui"
 
-test-ui:  ## Run Playwright browser tests (requires make ui server; runs standalone)
-	.venv/bin/pytest -m ui --browser chromium
+test-ui:  ## Run Playwright browser tests (optional: module=NAME test=NAME)
+	.venv/bin/pytest -m ui --browser chromium $(if $(module),tests/ui/$(module).py$(if $(test),::$(test),),)
 
 clean:  ## Remove venv and build artifacts
 	rm -rf .venv build dist *.egg-info
