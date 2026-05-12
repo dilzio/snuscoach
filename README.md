@@ -117,7 +117,7 @@ make ui             # opens localhost:8080
 | `make backup-db` | Snapshot DB to timestamped backup |
 | `make purge-stubs` | Remove stub LLM responses from DB |
 
-### Web UI
+### Web UI (in development)
 | Command | Description |
 |---------|-------------|
 | `make ui` | Launch NiceGUI web app at localhost:8080 |
@@ -169,18 +169,24 @@ SNUSCOACH_PROFILE=name                # select a non-default user profile
 SNUSCOACH_LOG=true                    # default: true
 SNUSCOACH_LOG_DIR=/path/to/logs       # default: ~/.snuscoach/logs
 SNUSCOACH_PORT=8080                   # web UI port
+# LLM stub overrides — for offline dev. Set to "true" to skip real API calls and return canned responses.
+# Canned responses are marked with "[CANNED RESPONSE]" and can be purged from DB with: make purge-stubs
+SNUSCOACH_STUB_CHAT=true
+SNUSCOACH_STUB_POST_DRAFT=true
+SNUSCOACH_STUB_MEETING_PREP=true
+SNUSCOACH_STUB_MEETING_DEBRIEF=true
+SNUSCOACH_STUB_JOURNAL=true
+SNUSCOACH_STUB_REFLECT=true
+SNUSCOACH_STUB_NUDGE_INTERACTIVE=true
+SNUSCOACH_STUB_NUDGE_REPORT=true
 ```
 
 ## Testing
 
 ```bash
 make test                             # pytest suite — 23+ test files, real SQLite, no DB mocks
-make test-ui                          # Playwright browser tests
-make test-ui module=meetings          # single UI module
+make test-ui                          # Playwright browser tests (optionally run single module test with module=<module name> test=<test name>)
 ```
-
-Stub env vars (`SNUSCOACH_STUB_CHAT`, `SNUSCOACH_STUB_POST_DRAFT`, etc.) bypass the Claude API and return canned responses for offline development.
-
 ## Docs
 
 - [`docs/PRD.md`](docs/PRD.md) — product spec, goals, non-goals, phasing
