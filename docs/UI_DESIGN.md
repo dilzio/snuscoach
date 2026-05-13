@@ -350,19 +350,21 @@ Maps to `coach.conversation()` (Opus) for all session chat.
 **Wins ledger (left top):**
 - All wins from `db.list_wins()`, sorted newest-first
 - Each entry shows title, truncated description, date
-- Clicking a win highlights it; selected wins are mentioned in the chat context
-- [+ Add Win] button → inline form (title + description textarea); saves via `db.add_win()`
+- Clicking a win **highlights** it (single selection). When highlighted, an **"Open in chat →"** button appears inline on the card. Clicking it injects a structured draft request about that win via `panel.inject()`. Matches the Home dashboard's "Open in chat ▸" nudge card pattern. Selection is toggled off by clicking the same card again.
+- `coach.draft()` already loads all wins into its system context via `_system_blocks()` — the inject just points the coach at the specific win.
+- [+ Add Win] button → dialog (title required, description optional); saves via `db.add_win()`
 
 **Post history (left bottom):**
 - All saved posts from `db.list_posts()`, newest-first
-- Each entry shows channel, audience, date, and truncated content
-- Read-only; click to expand full text in a dialog
+- Each entry shows channel, audience (if any), date, and truncated first line of content
+- Read-only; click anywhere on a post card to expand its full content in a dialog (rendered as `ui.markdown`)
 
 **Drafting chat (right):**
 - Maps to `coach.draft()` (Sonnet) — faster, no thinking
-- Pre-loaded context: full wins ledger + post history (same as CLI post command)
+- Pre-loaded context: full wins ledger + post history auto-loaded by `coach.draft()` via `_system_blocks()` (same as CLI post command)
+- Thread key: `"wins-posts-draft"` — single shared thread for this page, persists across page loads
 - User describes what to draft; AI produces the post; iterate in chat
-- [Save Post] button appears below the latest AI response; clicking opens a small dialog to record channel, audience, and optional posted_at date; saves via `db.add_post()`
+- **[Save Post ▾]** button: fixed in the right column header row (`flex-shrink: 0`), always visible above the chat panel regardless of scroll position. Clicking opens a dialog pre-filled with the last AI response (editable): content (required), channel (required), audience (optional), posted_at (default today). Saves via `db.add_post()`; post history refreshes.
 
 ---
 

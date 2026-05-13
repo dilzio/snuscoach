@@ -101,7 +101,7 @@ Design doc: [`docs/UI_DESIGN.md`](UI_DESIGN.md)
 | Home dashboard: open chat + nudge card + upcoming meetings card + wins-gap card | ✅ | `feature/home-dashboard`; ChatPanel wired to Opus; Playwright tests in `tests/ui/test_home_dashboard.py` |
 | Meetings section: meeting list + series + detail view + prep/debrief chat | ✅ | `feature/meetings-ui`; UX redesigned in `feature/meetings-ux-redesign` (table list view, tabbed prep/debrief sessions, read-only AI outputs); 33 Playwright tests |
 | Stakeholders section: list by tier + detail view + add/edit + delete + contextual chat | ✅ | `feature/stakeholders-ui`; tier-grouped list, profile edit, notes log, delete with confirm, persistent chat threads; 33 Playwright tests |
-| Wins & Posts section: wins ledger + post history + AI drafting chat + save post | ❌ | |
+| Wins & Posts section: wins ledger + post history + AI drafting chat + save post | ✅ | `feature/wins-posts-ui`; wins ledger with selection + inject, post history with expand dialog, Save Post dialog, persistent draft thread; Playwright tests in `tests/ui/test_wins_posts.py` |
 | Journal section: entry history + daily check-in chat | ❌ | |
 | Admin section: profile list/edit + voice samples | ❌ | |
 | Integration tests for web pages (NiceGUI test client) | ❌ | |
