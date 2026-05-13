@@ -372,6 +372,14 @@ def list_wins() -> list:
         )
 
 
+def update_win(win_id: int, title: str, description: str | None) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE wins SET title=?, description=? WHERE id=?",
+            (title, description, win_id),
+        )
+
+
 # ---- posts ----
 
 def add_post(
