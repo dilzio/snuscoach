@@ -292,12 +292,17 @@ def test_win_deselect_hides_open_in_chat_button(
 ) -> None:
     _seed_data(ui_db_path)
     _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    # Count baseline (post cards already have "Open in chat →" buttons)
+    baseline = page.locator("button:has-text('Open in chat →')").count()
     page.locator("text=Shipped X").first.click()
     page.wait_for_timeout(300)
+    # Selected: one more button on the win card
+    assert page.locator("button:has-text('Open in chat →')").count() == baseline + 1
     # Click again to deselect
     page.locator("text=Shipped X").first.click()
     page.wait_for_timeout(300)
-    expect(page.locator("button:has-text('Open in chat →')")).to_have_count(0)
+    # Back to baseline
+    assert page.locator("button:has-text('Open in chat →')").count() == baseline
 
 
 def test_win_open_in_chat_injects_message(
@@ -398,27 +403,64 @@ def test_save_post_creates_and_refreshes(
 
 
 # ---------------------------------------------------------------------------
-# Post expand dialog
+# Post card buttons
 # ---------------------------------------------------------------------------
 
-def test_post_card_click_opens_expand_dialog(
+def test_post_view_button_visible(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
     _seed_data(ui_db_path)
     _goto(page, f"{ui_base_url}{WINS_POSTS}")
-    # Click on the slack-eng post card
-    page.locator("text=slack-eng").first.click()
+    expect(page.locator("button:has-text('View')").first).to_be_visible()
+
+
+def test_post_open_in_chat_button_visible(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _seed_data(ui_db_path)
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    # "Open in chat →" appears on post cards (separate from win cards)
+    expect(page.locator("button:has-text('Open in chat →')").first).to_be_visible()
+
+
+def test_post_open_in_chat_switches_context(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _seed_data(ui_db_path)
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    # Click "Open in chat →" on the first post card
+    page.locator("button:has-text('Open in chat →')").first.click()
+    page.wait_for_timeout(500)
+    # Right panel label should now reference the channel
+    expect(page.locator("text=Iterating:").first).to_be_visible()
+
+
+# ---------------------------------------------------------------------------
+# Post expand dialog (opened via View button)
+# ---------------------------------------------------------------------------
+
+def _open_slack_eng_expand(page: Page, ui_base_url: str, ui_db_path: Path) -> None:
+    _seed_data(ui_db_path)
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    # Target the slack-eng card by its card-level classes + text — avoids
+    # picking a newer post that sorts to the top after other tests insert rows.
+    page.locator("div.rounded.q-mb-xs").filter(has_text="slack-eng").locator(
+        "button:has-text('View')"
+    ).first.click()
     page.wait_for_timeout(300)
+
+
+def test_post_view_button_opens_expand_dialog(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_slack_eng_expand(page, ui_base_url, ui_db_path)
     expect(page.locator(".q-dialog").first).to_be_visible()
 
 
 def test_post_expand_dialog_shows_full_content(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _seed_data(ui_db_path)
-    _goto(page, f"{ui_base_url}{WINS_POSTS}")
-    page.locator("text=slack-eng").first.click()
-    page.wait_for_timeout(300)
+    _open_slack_eng_expand(page, ui_base_url, ui_db_path)
     # Full content (not just snippet) should be visible
     expect(page.locator("text=This reduced error rates by 40%").first).to_be_visible()
 
@@ -426,10 +468,180 @@ def test_post_expand_dialog_shows_full_content(
 def test_post_expand_dialog_closes(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    _seed_data(ui_db_path)
-    _goto(page, f"{ui_base_url}{WINS_POSTS}")
-    page.locator("text=slack-eng").first.click()
-    page.wait_for_timeout(300)
+    _open_slack_eng_expand(page, ui_base_url, ui_db_path)
     page.locator(".q-dialog button:has-text('Close')").first.click()
     page.wait_for_timeout(300)
     expect(page.locator(".q-dialog")).to_have_count(0)
+
+
+# ---------------------------------------------------------------------------
+# Edit post
+# ---------------------------------------------------------------------------
+
+def test_edit_post_button_visible(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_slack_eng_expand(page, ui_base_url, ui_db_path)
+    expect(page.locator(".q-dialog button:has-text('Edit')").first).to_be_visible()
+
+
+def test_edit_post_shows_textarea(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_slack_eng_expand(page, ui_base_url, ui_db_path)
+    page.locator(".q-dialog button:has-text('Edit')").first.click()
+    page.wait_for_timeout(300)
+    expect(page.locator(".q-dialog textarea").first).to_be_visible()
+
+
+def test_edit_post_saves_changes(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    ids = _seed_data(ui_db_path)
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    page.locator("button:has-text('View')").first.click()
+    page.wait_for_timeout(300)
+    page.locator(".q-dialog button:has-text('Edit')").first.click()
+    page.wait_for_timeout(300)
+
+    # Update the content in the textarea
+    ta = page.locator(".q-dialog textarea").first
+    ta.fill("Updated post content XYZ")
+    # Fill channel (pre-populated but must not be empty)
+    channel_inputs = page.locator(".q-dialog input")
+    channel_inputs.first.fill("slack-eng-updated")
+
+    page.locator(".q-dialog button:has-text('Save')").first.click()
+    page.wait_for_timeout(600)
+
+    # Dialog should close
+    expect(page.locator(".q-dialog")).to_have_count(0)
+
+    # Verify DB was updated
+    conn = sqlite3.connect(str(ui_db_path))
+    row = conn.execute(
+        "SELECT content, channel FROM posts WHERE channel='slack-eng-updated'"
+    ).fetchone()
+    conn.close()
+    assert row is not None
+    assert "Updated post content XYZ" in row[0]
+
+
+def test_edit_post_cancel_returns_to_view(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _open_slack_eng_expand(page, ui_base_url, ui_db_path)
+    page.locator(".q-dialog button:has-text('Edit')").first.click()
+    page.wait_for_timeout(300)
+    page.locator(".q-dialog button:has-text('Cancel')").first.click()
+    page.wait_for_timeout(300)
+    # Should return to read-only view (Edit button visible again)
+    expect(page.locator(".q-dialog button:has-text('Edit')").first).to_be_visible()
+
+
+# ---------------------------------------------------------------------------
+# New draft button and context switching
+# ---------------------------------------------------------------------------
+
+def test_new_draft_button_visible(page: Page, ui_base_url: str) -> None:
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    expect(page.locator("button:has-text('New draft')").first).to_be_visible()
+
+
+def test_win_context_label_on_open_in_chat(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _seed_data(ui_db_path)
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    page.locator("text=Shipped X").first.click()
+    page.wait_for_timeout(400)
+    page.locator("button:has-text('Open in chat')").first.click()
+    page.wait_for_timeout(400)
+    # Right panel label should reference the win title
+    expect(page.locator("text=Draft:").first).to_be_visible()
+
+
+def test_new_draft_resets_context(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    _seed_data(ui_db_path)
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    page.locator("text=Shipped X").first.click()
+    page.wait_for_timeout(400)
+    page.locator("button:has-text('Open in chat')").first.click()
+    page.wait_for_timeout(400)
+    # Switch back to generic draft
+    page.locator("button:has-text('New draft')").first.click()
+    page.wait_for_timeout(400)
+    expect(page.locator("text=Drafting chat").first).to_be_visible()
+
+
+# ---------------------------------------------------------------------------
+# Win→post badge
+# ---------------------------------------------------------------------------
+
+def _seed_linked_post(db_path: Path, win_id: int) -> int:
+    """Seed a post with win_id set (for badge tests)."""
+    conn = sqlite3.connect(str(db_path))
+    try:
+        cur = conn.execute(
+            "INSERT INTO posts (content, channel, audience, posted_at, created_at, win_id)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "Post linked to a specific win.",
+                "slack-linked",
+                None,
+                "2026-05-10",
+                "2026-05-10T10:00:00",
+                win_id,
+            ),
+        )
+        post_id = cur.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return post_id
+
+
+def test_win_badge_shown_when_win_has_post(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    ids = _seed_data(ui_db_path)
+    _seed_linked_post(ui_db_path, ids["win1_id"])
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+    expect(page.locator("text=✓ posted").first).to_be_visible()
+
+
+def test_save_post_records_win_id(
+    page: Page, ui_base_url: str, ui_db_path: Path
+) -> None:
+    ids = _seed_data(ui_db_path)
+    _goto(page, f"{ui_base_url}{WINS_POSTS}")
+
+    # Open win in chat (sets active_win_id)
+    page.locator("text=Shipped X").first.click()
+    page.wait_for_timeout(400)
+    page.locator("button:has-text('Open in chat')").first.click()
+    page.wait_for_timeout(400)
+
+    # Save a post from this context
+    page.locator("button:has-text('Save Post')").first.click()
+    page.wait_for_timeout(300)
+
+    content_ta = page.locator(".q-dialog textarea").first
+    content_ta.fill("Win-linked post content ZZZ")
+    channel_input = page.locator(".q-dialog input").first
+    channel_input.fill("slack-win-linked")
+
+    page.locator(".q-dialog button:has-text('Save')").first.click()
+    page.wait_for_timeout(600)
+
+    expect(page.locator(".q-dialog")).to_have_count(0)
+
+    conn = sqlite3.connect(str(ui_db_path))
+    row = conn.execute(
+        "SELECT win_id FROM posts WHERE channel='slack-win-linked'"
+    ).fetchone()
+    conn.close()
+    assert row is not None
+    assert row[0] == ids["win1_id"]

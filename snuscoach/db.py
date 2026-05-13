@@ -59,6 +59,18 @@ def init_db() -> None:
         if needs_migration:
             _migrate_to_meeting_centric(conn)
         _ensure_schema(conn)
+        _ensure_post_win_id(conn)
+
+
+def _ensure_post_win_id(conn: sqlite3.Connection) -> None:
+    """Additive migration: add win_id to posts if the column is absent."""
+    try:
+        conn.execute(
+            "ALTER TABLE posts ADD COLUMN"
+            " win_id INTEGER REFERENCES wins(id) ON DELETE SET NULL"
+        )
+    except Exception:
+        pass  # column already exists — safe to ignore
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -91,7 +103,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             channel TEXT NOT NULL,
             audience TEXT,
             posted_at TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            win_id INTEGER REFERENCES wins(id) ON DELETE SET NULL
         );
 
         CREATE TABLE IF NOT EXISTS meeting_series (
@@ -362,15 +375,35 @@ def list_wins() -> list:
 # ---- posts ----
 
 def add_post(
-    content: str, channel: str, audience: str | None, posted_at: str
+    content: str,
+    channel: str,
+    audience: str | None,
+    posted_at: str,
+    win_id: int | None = None,
 ) -> int:
     with connect() as conn:
         cur = conn.execute(
-            """INSERT INTO posts (content, channel, audience, posted_at, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (content, channel, audience, posted_at, _now()),
+            """INSERT INTO posts (content, channel, audience, posted_at, created_at, win_id)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (content, channel, audience, posted_at, _now(), win_id),
         )
         return cur.lastrowid
+
+
+def update_post(
+    post_id: int,
+    content: str,
+    channel: str,
+    audience: str | None,
+    posted_at: str,
+) -> None:
+    with connect() as conn:
+        conn.execute(
+            """UPDATE posts
+               SET content = ?, channel = ?, audience = ?, posted_at = ?
+               WHERE id = ?""",
+            (content, channel, audience, posted_at, post_id),
+        )
 
 
 def list_posts() -> list:

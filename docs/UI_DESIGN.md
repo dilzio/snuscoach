@@ -330,41 +330,49 @@ Maps to `coach.conversation()` (Opus) for all session chat.
 
 ```
 ┌────────┬───────────────────┬──────────────────────────────────┐
-│  nav   │  Wins ledger      │  Drafting chat                   │
-│        │  ┌─────────────┐  │                                  │
-│        │  │ Shipped X   │  │  Coach: What would you like to   │
-│        │  │ 2026-05-01  │  │  draft? A Slack post, email to   │
-│        │  ├─────────────┤  │  skip, brag doc entry?           │
-│        │  │ Led Y       │  │                                  │
-│        │  │ 2026-04-20  │  │  You: Draft a Slack post about   │
-│        │  └─────────────┘  │  shipping X for the eng channel  │
-│        │  [+ Add Win]       │  Coach: Here's a draft...       │
-│        │                   │                                  │
-│        │  ─────────────    │  [Save Post ▾]                   │
+│  nav   │  Wins ledger      │  [New draft]       [Save Post ▾] │
+│        │  ┌───────────────┐│  Drafting chat                   │
+│        │  │ Shipped X ✓   ││                                  │
+│        │  │ 2026-05-01    ││  Coach: What would you like to   │
+│        │  ├───────────────┤│  draft?                          │
+│        │  │ Led Y         ││                                  │
+│        │  │ 2026-04-20    ││  You: Draft a post about X...   │
+│        │  └───────────────┘│  Coach: Here's a draft...        │
+│        │  [+ Add Win]       │                                  │
+│        │                   │  [______________________] [Send] │
+│        │  ─────────────    │                                  │
 │        │  Post history     │                                  │
-│        │  • Slack #eng ... │  [______________________] [Send] │
-│        │  • Email mgr ...  │                                  │
+│        │  ┌───────────────┐│                                  │
+│        │  │ slack-eng     ││                                  │
+│        │  │ [View][Chat→] ││                                  │
+│        │  └───────────────┘│                                  │
 └────────┴───────────────────┴──────────────────────────────────┘
 ```
 
 **Wins ledger (left top):**
 - All wins from `db.list_wins()`, sorted newest-first
 - Each entry shows title, truncated description, date
-- Clicking a win **highlights** it (single selection). When highlighted, an **"Open in chat →"** button appears inline on the card. Clicking it injects a structured draft request about that win via `panel.inject()`. Matches the Home dashboard's "Open in chat ▸" nudge card pattern. Selection is toggled off by clicking the same card again.
-- `coach.draft()` already loads all wins into its system context via `_system_blocks()` — the inject just points the coach at the specific win.
+- Win cards show a **"✓ posted"** badge (green) when the win has at least one linked post in the DB (`posts.win_id = wins.id`)
+- Clicking a win **highlights** it (single selection). When highlighted, an **"Open in chat →"** button appears inline on the card. Clicking it switches the right panel to a per-win chat thread (`win-{id}`) seeded with a structured draft request about that win. Selection is toggled off by clicking the same card again.
+- `coach.draft()` already loads all wins into its system context via `_system_blocks()` — the seed message just focuses the coach on the specific win.
 - [+ Add Win] button → dialog (title required, description optional); saves via `db.add_win()`
 
 **Post history (left bottom):**
 - All saved posts from `db.list_posts()`, newest-first
 - Each entry shows channel, audience (if any), date, and truncated first line of content
-- Read-only; click anywhere on a post card to expand its full content in a dialog (rendered as `ui.markdown`)
+- Each post card has two explicit buttons:
+  - **[View]** — opens the full post content in an expand dialog (rendered as `ui.markdown`). The dialog has an **[Edit]** button that switches to an editable form (content, channel, audience, posted_at fields); saving calls `db.update_post()` and refreshes the post list.
+  - **[Open in chat →]** — switches the right panel to a per-post chat thread (`post-{id}`) seeded with the post content, for further iteration with the coach.
 
 **Drafting chat (right):**
 - Maps to `coach.draft()` (Sonnet) — faster, no thinking
 - Pre-loaded context: full wins ledger + post history auto-loaded by `coach.draft()` via `_system_blocks()` (same as CLI post command)
-- Thread key: `"wins-posts-draft"` — single shared thread for this page, persists across page loads
-- User describes what to draft; AI produces the post; iterate in chat
-- **[Save Post ▾]** button: fixed in the right column header row (`flex-shrink: 0`), always visible above the chat panel regardless of scroll position. Clicking opens a dialog pre-filled with the last AI response (editable): content (required), channel (required), audience (optional), posted_at (default today). Saves via `db.add_post()`; post history refreshes.
+- **Three chat contexts**, each with its own persistent thread:
+  - Generic draft (`"wins-posts-draft"`) — default on page load; the user describes what to draft
+  - Per-win (`"win-{id}"`) — activated by "Open in chat →" on a selected win card; seeded with a focused draft request for that win
+  - Per-post (`"post-{id}"`) — activated by "Open in chat →" on a post card; seeded with the existing post content for iteration
+- **[New draft]** button (flat, always visible in the right panel header): resets to the generic draft context and clears win selection
+- **[Save Post ▾]** button: always visible in the right panel header row. Opens a dialog pre-filled with the last AI response: content (required), channel (required), audience (optional), posted_at (default today). When saving from a per-win context, records `win_id` on the new post row so the win badge updates. Saves via `db.add_post(win_id=...)`; both post history and wins ledger refresh (badge state updates).
 
 ---
 
