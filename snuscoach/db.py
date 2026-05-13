@@ -365,6 +365,11 @@ def add_win(title: str, description: str | None) -> int:
         return cur.lastrowid
 
 
+def get_win(win_id: int):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM wins WHERE id=?", (win_id,)).fetchone()
+
+
 def list_wins() -> list:
     with connect() as conn:
         return list(
