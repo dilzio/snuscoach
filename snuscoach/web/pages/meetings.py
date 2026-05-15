@@ -272,11 +272,11 @@ def _render_prep_tab(meeting_id: int, prep_panel: list, brief_container: list) -
         ui.button(
             "Generate Prep Brief",
             on_click=lambda: asyncio.ensure_future(_do_prep_with_save(meeting_id, prep_panel, notes_ta)),
-        ).props("flat dense color=primary")
+        ).props("unelevated dense icon=auto_awesome color=primary size=sm")
         ui.button(
             "Save as Prep Brief ↓",
             on_click=lambda: _save_as_brief(meeting_id, prep_panel, brief_container),
-        ).props("flat dense")
+        ).props("flat dense size=sm")
 
     ui.separator().classes("q-my-xs")
 
@@ -307,11 +307,11 @@ def _render_debrief_tab(meeting_id: int, debrief_panel: list, summary_container:
         ui.button(
             "Generate Debrief Summary",
             on_click=lambda: asyncio.ensure_future(_do_debrief_with_save(meeting_id, debrief_panel, notes_ta)),
-        ).props("flat dense color=secondary")
+        ).props("unelevated dense icon=auto_awesome color=secondary size=sm")
         ui.button(
             "Save as Debrief Summary ↓",
             on_click=lambda: _save_as_summary(meeting_id, debrief_panel, summary_container),
-        ).props("flat dense")
+        ).props("flat dense size=sm")
 
     ui.separator().classes("q-my-xs")
 
@@ -371,7 +371,7 @@ def _render_detail_left(
         with main_container[0]:
             _render_list(main_container)
 
-    ui.button("← Back", on_click=_go_back).props("flat dense").classes("q-mb-sm")
+    ui.button("Back", on_click=_go_back).props("flat dense icon=chevron_left").classes("q-mb-sm text-grey")
 
     # --- Meeting Setup ---
     title_in = [None]
@@ -402,7 +402,7 @@ def _render_detail_left(
             )
             ui.notify("Meeting saved.")
 
-        ui.button("Save meeting", on_click=_save_setup).props("color=primary dense").classes("q-mt-sm")
+        ui.button("Save meeting", on_click=_save_setup).props("unelevated dense color=primary size=sm").classes("q-mt-sm")
 
     # --- Prep ---
     with ui.expansion("Prep", value=True).classes("w-full"):
@@ -431,7 +431,7 @@ def _open_detail(meeting_id: int, initial_tab: str, main_container: list) -> Non
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
                 "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
-                "background: #fff; border-right: 1px solid var(--sc-border)"
+                "background: #fafafa; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_detail_left(meeting_id, tabs_ref, brief_container, summary_container, main_container)
 
@@ -492,97 +492,35 @@ def _open_new_meeting_dialog(main_container: list) -> None:
 # List view (full-width table)
 # ---------------------------------------------------------------------------
 
-def _prep_debrief_indicator(has_content: bool) -> str:
-    return "●" if has_content else "○"
+def _render_meeting_rows(meetings: list, main_container: list) -> None:
+    for m in meetings:
+        has_prep = bool(m["prep_brief"])
+        has_debrief = bool(m["debrief_summary"])
+        mid = m["id"]
 
+        with ui.element("tr").classes("sc-tr-click cursor-pointer"):
+            with ui.element("td").on("click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)):
+                ui.label(m["title"]).classes("text-body2 text-bold")
+            with ui.element("td").on("click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)):
+                ui.label(m["date"]).classes("text-caption text-grey")
+            with ui.element("td").on("click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)):
+                ui.label(m["attendees"] or "—").classes("text-caption")
 
-def _render_group_table(
-    meetings: list,
-    main_container: list,
-) -> None:
-    """Render one table for a group of meetings (a series or one-offs)."""
-    if not meetings:
-        return
+            with ui.element("td").style("text-align: center"):
+                with ui.row().classes("gap-1 items-center justify-center no-wrap"):
+                    ui.element("span").classes(f"sc-dot {'sc-dot--on' if has_prep else 'sc-dot--off'}")
+                    ui.button("→", on_click=lambda _mid=mid: _open_detail(_mid, "prep", main_container)).props("flat dense size=xs")
 
-    with ui.element("table").classes("w-full").style(
-        "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid var(--sc-border); border-radius: 6px; overflow: hidden"
-    ):
-        with ui.element("thead"):
-            with ui.element("tr").style(
-                "border-bottom: 1px solid var(--sc-border);"
-                "background: var(--sc-border-light)"
-            ):
-                for label, width in [
-                    ("Meeting", "32%"),
-                    ("Date", "13%"),
-                    ("Attendees", "27%"),
-                    ("Prep", "9%"),
-                    ("Debrief", "9%"),
-                    ("", "10%"),
-                ]:
-                    with ui.element("th").classes("sc-label text-left q-pa-xs").style(
-                        f"width: {width}"
-                    ):
-                        ui.label(label)
+            with ui.element("td").style("text-align: center"):
+                with ui.row().classes("gap-1 items-center justify-center no-wrap"):
+                    ui.element("span").classes(f"sc-dot {'sc-dot--on' if has_debrief else 'sc-dot--off'}")
+                    ui.button("→", on_click=lambda _mid=mid: _open_detail(_mid, "debrief", main_container)).props("flat dense size=xs")
 
-        with ui.element("tbody"):
-            for m in meetings:
-                has_prep = bool(m["prep_brief"])
-                has_debrief = bool(m["debrief_summary"])
-                mid = m["id"]
-
-                with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid var(--sc-border-light)"
-                ):
-                    # Meeting name — click opens detail
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)
-                    ):
-                        ui.label(m["title"]).classes("text-body2 text-bold cursor-pointer")
-
-                    # Date
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)
-                    ):
-                        ui.label(m["date"]).classes("text-caption text-grey")
-
-                    # Attendees
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click", lambda _mid=mid: _open_detail(_mid, "prep", main_container)
-                    ):
-                        ui.label(m["attendees"] or "—").classes("text-caption")
-
-                    # Prep column
-                    with ui.element("td").classes("q-pa-xs text-center"):
-                        with ui.row().classes("gap-1 items-center justify-center no-wrap"):
-                            ui.label(_prep_debrief_indicator(has_prep)).classes(
-                                "text-body2 " + ("text-positive" if has_prep else "text-grey-6")
-                            )
-                            ui.button(
-                                "→",
-                                on_click=lambda _mid=mid: _open_detail(_mid, "prep", main_container),
-                            ).props("flat dense size=xs")
-
-                    # Debrief column
-                    with ui.element("td").classes("q-pa-xs text-center"):
-                        with ui.row().classes("gap-1 items-center justify-center no-wrap"):
-                            ui.label(_prep_debrief_indicator(has_debrief)).classes(
-                                "text-body2 " + ("text-positive" if has_debrief else "text-grey-6")
-                            )
-                            ui.button(
-                                "→",
-                                on_click=lambda _mid=mid: _open_detail(_mid, "debrief", main_container),
-                            ).props("flat dense size=xs")
-
-                    # Delete column
-                    with ui.element("td").classes("q-pa-xs text-center"):
-                        ui.button(
-                            "✕",
-                            on_click=lambda _mid=mid, _title=m["title"]: _confirm_delete_meeting(
-                                _mid, _title, main_container
-                            ),
-                        ).props("flat dense size=xs color=negative")
+            with ui.element("td").style("text-align: center"):
+                ui.button(
+                    "✕",
+                    on_click=lambda _mid=mid, _title=m["title"]: _confirm_delete_meeting(_mid, _title, main_container),
+                ).props("flat dense size=xs color=negative")
 
 
 def _render_list(main_container: list) -> None:
@@ -600,28 +538,40 @@ def _render_list(main_container: list) -> None:
         key=lambda sid: all_series[sid]["name"].lower(),
     )
 
-    with ui.row().classes("w-full items-center justify-between q-pb-sm").style("flex-shrink: 0"):
+    with ui.row().classes("w-full items-center justify-between sc-page-header"):
         with ui.row().classes("items-center gap-2"):
             ui.icon("groups", size="sm").style("color: var(--sc-accent-meet)")
-            ui.label("Meetings").classes("text-h6")
+            ui.label("Meetings").classes("text-subtitle1 text-bold")
         ui.button(
             "+ New Meeting",
             on_click=lambda: _open_new_meeting_dialog(main_container),
-        ).props("flat dense")
+        ).props("unelevated dense").classes("bg-primary text-white text-caption")
 
     if not meetings:
-        ui.label("No meetings yet.").classes("text-caption text-grey q-mt-sm")
+        ui.label("No meetings yet.").classes("text-caption text-grey q-pa-md")
         return
 
     with ui.scroll_area().classes("w-full").style("flex: 1"):
-        for sid in named_sids:
-            series_name = all_series[sid]["name"]
-            ui.label(series_name).classes("text-overline text-bold q-mt-md q-mb-xs")
-            _render_group_table(buckets[sid], main_container)
-
-        if None in buckets:
-            ui.label("One-off meetings").classes("text-overline text-bold q-mt-md q-mb-xs")
-            _render_group_table(buckets[None], main_container)
+        with ui.element("table").classes("sc-table w-full"):
+            with ui.element("thead"):
+                with ui.element("tr"):
+                    for label, width in [
+                        ("Meeting", "32%"), ("Date", "13%"), ("Attendees", "27%"),
+                        ("Prep", "9%"), ("Debrief", "9%"), ("", "10%"),
+                    ]:
+                        with ui.element("th").style(f"width: {width}"):
+                            ui.label(label)
+            with ui.element("tbody"):
+                for sid in named_sids:
+                    with ui.element("tr").classes("sc-tr-section"):
+                        with ui.element("td").props('colspan="6"'):
+                            ui.label(all_series[sid]["name"])
+                    _render_meeting_rows(buckets[sid], main_container)
+                if None in buckets:
+                    with ui.element("tr").classes("sc-tr-section"):
+                        with ui.element("td").props('colspan="6"'):
+                            ui.label("One-off meetings")
+                    _render_meeting_rows(buckets[None], main_container)
 
 
 # ---------------------------------------------------------------------------
@@ -632,9 +582,9 @@ def _render_list(main_container: list) -> None:
 def meetings_page() -> None:
     create_nav("/meetings")
 
-    with ui.column().classes("w-full q-pa-md").style(
-        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column;"
-        "background: var(--sc-content-bg)"
+    with ui.column().classes("w-full").style(
+        "height: calc(100vh - 56px); overflow: hidden; display: flex; flex-direction: column;"
+        "background: #fff"
     ) as outer:
         main_container: list = [outer]
         _render_list(main_container)

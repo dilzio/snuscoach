@@ -143,22 +143,19 @@ def test_list_shows_meeting_row(
 def test_list_prep_indicator_filled(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    """m1 has prep_brief — ● indicator should be visible (green)."""
+    """m1 has prep_brief — filled dot indicator should be present."""
     _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
-    # At least one filled indicator in the page
-    expect(page.locator("text=●").first).to_be_visible()
+    expect(page.locator(".sc-dot--on").first).to_be_visible()
 
 
 def test_list_debrief_indicator_filled(
     page: Page, ui_base_url: str, ui_db_path: Path
 ) -> None:
-    """m2 has debrief_summary — ● indicator should be visible."""
+    """m2 has debrief_summary — filled dot indicator should be present."""
     _seed_meetings(ui_db_path)
     _goto(page, f"{ui_base_url}{MEETINGS}")
-    # m2's debrief ● is also a filled indicator
-    filled = page.locator("text=●")
-    expect(filled.first).to_be_visible()
+    expect(page.locator(".sc-dot--on").first).to_be_visible()
 
 
 # ---------------------------------------------------------------------------

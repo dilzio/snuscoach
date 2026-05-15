@@ -86,6 +86,54 @@ _CSS = """
 .sc-nav-item .q-item__label {
   color: inherit !important;
 }
+
+/* ── List-page header bar (white with bottom border) ────────── */
+.sc-page-header {
+  padding: 13px 20px !important;
+  border-bottom: 1px solid var(--sc-border) !important;
+  background: #fff !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* ── Full-page data table ────────────────────────────────────── */
+.sc-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.sc-table thead th {
+  text-align: left;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: var(--sc-label-color) !important;
+  padding: 9px 14px !important;
+  border-bottom: 2px solid var(--sc-border) !important;
+  background: #fafafa !important;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  white-space: nowrap;
+}
+.sc-table tbody td {
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--sc-border-light) !important;
+  vertical-align: middle !important;
+}
+.sc-table tbody tr.sc-tr-click:hover td { background: #f8faff !important; }
+.sc-table tbody tr.sc-tr-section td {
+  background: #f8fafc !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  color: var(--sc-label-color) !important;
+  padding: 6px 14px !important;
+  border-bottom: 1px solid var(--sc-border) !important;
+}
+
+/* Status dot (filled / empty) */
+.sc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.sc-dot--on  { background: var(--q-color-positive); }
+.sc-dot--off { background: #e2e8f0; border: 1.5px solid #cbd5e1; }
 """
 
 

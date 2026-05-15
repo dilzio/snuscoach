@@ -26,13 +26,14 @@ def create_nav(current_path: str = "/") -> None:
         ui.badge(_profile_label(), color="grey-7").classes("text-caption")
 
     with ui.left_drawer(fixed=True).style("background: var(--sc-sidebar-bg)").classes("q-pa-sm"):
-        for label, path, icon in _NAV_LINKS:
-            active = current_path == path
-            extra = " bg-primary text-white" if active else ""
-            with (
-                ui.row()
-                .classes(f"sc-nav-item{extra}")
-                .on("click", lambda p=path: ui.navigate.to(p))
-            ):
-                ui.icon(icon).classes("text-sm")
-                ui.label(label)
+        with ui.column().style("gap: 2px; width: 100%"):
+            for label, path, icon in _NAV_LINKS:
+                active = current_path == path
+                extra = " bg-primary text-white" if active else ""
+                with (
+                    ui.row()
+                    .classes(f"sc-nav-item{extra}")
+                    .on("click", lambda p=path: ui.navigate.to(p))
+                ):
+                    ui.icon(icon).classes("text-sm")
+                    ui.label(label)
