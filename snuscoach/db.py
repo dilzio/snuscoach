@@ -59,6 +59,18 @@ def init_db() -> None:
         if needs_migration:
             _migrate_to_meeting_centric(conn)
         _ensure_schema(conn)
+        _ensure_post_win_id(conn)
+
+
+def _ensure_post_win_id(conn: sqlite3.Connection) -> None:
+    """Additive migration: add win_id to posts if the column is absent."""
+    try:
+        conn.execute(
+            "ALTER TABLE posts ADD COLUMN"
+            " win_id INTEGER REFERENCES wins(id) ON DELETE SET NULL"
+        )
+    except Exception:
+        pass  # column already exists — safe to ignore
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -91,7 +103,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             channel TEXT NOT NULL,
             audience TEXT,
             posted_at TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            win_id INTEGER REFERENCES wins(id) ON DELETE SET NULL
         );
 
         CREATE TABLE IF NOT EXISTS meeting_series (
@@ -352,6 +365,11 @@ def add_win(title: str, description: str | None) -> int:
         return cur.lastrowid
 
 
+def get_win(win_id: int):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM wins WHERE id=?", (win_id,)).fetchone()
+
+
 def list_wins() -> list:
     with connect() as conn:
         return list(
@@ -359,18 +377,46 @@ def list_wins() -> list:
         )
 
 
+def update_win(win_id: int, title: str, description: str | None) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE wins SET title=?, description=? WHERE id=?",
+            (title, description, win_id),
+        )
+
+
 # ---- posts ----
 
 def add_post(
-    content: str, channel: str, audience: str | None, posted_at: str
+    content: str,
+    channel: str,
+    audience: str | None,
+    posted_at: str,
+    win_id: int | None = None,
 ) -> int:
     with connect() as conn:
         cur = conn.execute(
-            """INSERT INTO posts (content, channel, audience, posted_at, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (content, channel, audience, posted_at, _now()),
+            """INSERT INTO posts (content, channel, audience, posted_at, created_at, win_id)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (content, channel, audience, posted_at, _now(), win_id),
         )
         return cur.lastrowid
+
+
+def update_post(
+    post_id: int,
+    content: str,
+    channel: str,
+    audience: str | None,
+    posted_at: str,
+) -> None:
+    with connect() as conn:
+        conn.execute(
+            """UPDATE posts
+               SET content = ?, channel = ?, audience = ?, posted_at = ?
+               WHERE id = ?""",
+            (content, channel, audience, posted_at, post_id),
+        )
 
 
 def list_posts() -> list:
@@ -672,6 +718,14 @@ def get_latest_journal_entry():
         return conn.execute(
             "SELECT * FROM journal_entries ORDER BY created_at DESC, id DESC LIMIT 1"
         ).fetchone()
+
+
+def update_journal_entry(entry_id: int, content: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE journal_entries SET content=?, updated_at=? WHERE id=?",
+            (content, _now(), entry_id),
+        )
 
 
 def add_nudge(date: str, report: str, gaps_json: str | None = None) -> int:

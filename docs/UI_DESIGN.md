@@ -326,43 +326,90 @@ Maps to `coach.conversation()` (Opus) for all session chat.
 
 **Route:** `/wins-posts`
 
-**Layout:** Three areas. Left column split vertically: wins ledger (top) + post history (bottom). Right column: AI drafting chat.
+**Layout:** List view is full-width (single column, no chat panel). Detail view is two-column: left edit panel (~40%) + right chat panel (~60%). Mirrors the Meetings section UX.
+
+**Screen A — List view (default):**
 
 ```
-┌────────┬───────────────────┬──────────────────────────────────┐
-│  nav   │  Wins ledger      │  Drafting chat                   │
-│        │  ┌─────────────┐  │                                  │
-│        │  │ Shipped X   │  │  Coach: What would you like to   │
-│        │  │ 2026-05-01  │  │  draft? A Slack post, email to   │
-│        │  ├─────────────┤  │  skip, brag doc entry?           │
-│        │  │ Led Y       │  │                                  │
-│        │  │ 2026-04-20  │  │  You: Draft a Slack post about   │
-│        │  └─────────────┘  │  shipping X for the eng channel  │
-│        │  [+ Add Win]       │  Coach: Here's a draft...       │
-│        │                   │                                  │
-│        │  ─────────────    │  [Save Post ▾]                   │
-│        │  Post history     │                                  │
-│        │  • Slack #eng ... │  [______________________] [Send] │
-│        │  • Email mgr ...  │                                  │
-└────────┴───────────────────┴──────────────────────────────────┘
+┌────────┬────────────────────────────────────────────────────────────────┐
+│  nav   │  Wins                                           [+ Add Win]    │
+│        │  ┌──────────────────┬──────────────────────┬────────┬────────┐ │
+│        │  │ Title            │ Description           │ Date   │ Posted │ │
+│        │  ├──────────────────┼──────────────────────┼────────┼────────┤ │
+│        │  │ Shipped X        │ Delivered key...      │ May 1  │ ✓ [↗] │ │
+│        │  │ Led Y            │ —                     │ Apr 20 │   [↗] │ │
+│        │  └──────────────────┴──────────────────────┴────────┴────────┘ │
+│        │                                                                  │
+│        │  Posts                                          [+ New Post]    │
+│        │  ┌──────────────┬────────────┬──────────────┬──────────────┐   │
+│        │  │ Channel      │ Date       │ Audience      │ Win          │   │
+│        │  ├──────────────┼────────────┼──────────────┼──────────────┤   │
+│        │  │ slack-eng    │ 2026-05-01 │ eng team      │ Shipped X    │   │
+│        │  │ email-skip   │ 2026-04-25 │ —             │ —            │   │
+│        │  └──────────────┴────────────┴──────────────┴──────────────┘   │
+└────────┴────────────────────────────────────────────────────────────────┘
 ```
 
-**Wins ledger (left top):**
-- All wins from `db.list_wins()`, sorted newest-first
-- Each entry shows title, truncated description, date
-- Clicking a win highlights it; selected wins are mentioned in the chat context
-- [+ Add Win] button → inline form (title + description textarea); saves via `db.add_win()`
+**Wins table (top):**
+- Columns: Title | Description (truncated ~60 chars, `—` if none) | Date | Posted
+- "Posted" column: green ✓ indicator if at least one post has `win_id = this win.id`; a [↗ New Post] button always present opens the Save Post dialog pre-linked to this win
+- Clicking a row (Title / Description / Date cell) → opens Win detail view (Screen B)
+- [+ Add Win] button → dialog (title required, description optional); saves via `db.add_win()`
 
-**Post history (left bottom):**
-- All saved posts from `db.list_posts()`, newest-first
-- Each entry shows channel, audience, date, and truncated content
-- Read-only; click to expand full text in a dialog
+**Posts table (bottom):**
+- Columns: Channel | Posted at | Audience (`—` if none) | Win (linked win title, or `—`)
+- Clicking a row opens the post expand/edit dialog (full content rendered as `ui.markdown`, with inline [Edit] mode backed by `db.update_post()`)
+- [+ New Post] button → opens Save Post dialog with no pre-linked win
 
-**Drafting chat (right):**
-- Maps to `coach.draft()` (Sonnet) — faster, no thinking
-- Pre-loaded context: full wins ledger + post history (same as CLI post command)
-- User describes what to draft; AI produces the post; iterate in chat
-- [Save Post] button appears below the latest AI response; clicking opens a small dialog to record channel, audience, and optional posted_at date; saves via `db.add_post()`
+---
+
+**Screen B — Win detail view:**
+
+```
+┌────────┬──────────────────────────┬──────────────────────────────┐
+│  nav   │  ← Back                  │  Chat: Shipped X             │
+│        │                          ├──────────────────────────────┤
+│        │  ── Win Details ───────  │                              │
+│        │  Title  [Shipped X     ] │  You: Help me write a        │
+│        │  Description:            │  stronger description...     │
+│        │  [                    ]  │                              │
+│        │  [                    ]  │  Coach: Here's a tighter     │
+│        │  [          (4 rows)  ]  │  version: …                  │
+│        │                 [Save ↑] │                              │
+│        │                          │  [Adopt AI draft ↓]          │
+│        │  Created: 2026-05-01     │                              │
+│        │                          │  [________________________]  │
+│        │  ── Linked posts ──────  │  [Send]                      │
+│        │  • 2026-05-01 slack-eng  │                              │
+│        │  [+ New Post for Win]    │                              │
+└────────┴──────────────────────────┴──────────────────────────────┘
+```
+
+**Detail view — left panel:**
+- ← Back returns to list view
+- **Win Details**: Title (text input), Description (textarea, ~4 rows), [Save Win] button → `db.update_win(win_id, title, description)`
+- Created at shown as read-only label
+- **Linked posts**: lists posts where `win_id = this win.id` (channel + date per row); clicking a row opens the post expand/edit dialog
+- [+ New Post for Win] → Save Post dialog pre-linked to this win
+
+**Detail view — right panel (chat):**
+- Label: "Chat: {win title}"
+- Thread key: `win-{id}` — persistent across sessions
+- Maps to `coach.draft()` (Sonnet)
+- **No auto-LLM call on open** — chat loads prior thread history and waits; coach is only invoked when the user sends their first message
+- **[Adopt AI draft ↓]** button fixed in right panel header: reads the last assistant reply and writes it into the Description textarea on the left (does not auto-save; user must click [Save Win])
+
+**CRUD Workflow:**
+
+| Operation | Trigger | Function |
+|---|---|---|
+| Create win | [+ Add Win] → dialog | `db.add_win()` |
+| Read wins (list) | Page load | `db.list_wins()` |
+| Read win (detail) | Click row | pass win dict from list |
+| Update win | [Save Win] in detail | `db.update_win(win_id, title, description)` |
+| Create post | [↗ New Post] or [+ New Post for Win] | `db.add_post(win_id=...)` |
+| Read posts (list) | Page load | `db.list_posts()` |
+| Update post | [Edit] in expand dialog | `db.update_post()` |
 
 ---
 
