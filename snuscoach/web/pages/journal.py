@@ -53,7 +53,8 @@ def _open_detail(entry: dict | None, main_container: list) -> None:
     with main_container[0]:
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
-                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
+                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
+                "background: #fff; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_detail_left(entry, content_ta, panel_ref, _go_back)
 
@@ -154,7 +155,9 @@ def _render_list(main_container: list) -> None:
             with ui.row().classes("w-full items-center justify-between q-pb-xs").style(
                 "flex-shrink: 0"
             ):
-                ui.label("Journal").classes("text-overline text-bold q-mt-md q-mb-xs")
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("book", size="xs").style("color: var(--sc-accent-nudge)")
+                    ui.label("Journal").classes("sc-label q-mt-md q-mb-xs")
                 ui.button(
                     "+ New Entry",
                     on_click=lambda: _open_detail(None, main_container),
@@ -166,12 +169,12 @@ def _render_list(main_container: list) -> None:
 
             with ui.element("table").classes("w-full").style(
                 "border-collapse: collapse; table-layout: fixed;"
-                "border: 1px solid rgba(0,0,0,0.15); border-radius: 4px"
+                "border: 1px solid var(--sc-border); border-radius: 6px; overflow: hidden"
             ):
                 with ui.element("thead"):
                     with ui.element("tr").style(
-                        "border-bottom: 2px solid rgba(0,0,0,0.2);"
-                        "background: rgba(0,0,0,0.05)"
+                        "border-bottom: 1px solid var(--sc-border);"
+                        "background: var(--sc-border-light)"
                     ):
                         for label, width in [
                             ("Date", "18%"),
@@ -179,14 +182,14 @@ def _render_list(main_container: list) -> None:
                             ("Preview", "67%"),
                         ]:
                             with ui.element("th").classes(
-                                "text-caption text-grey text-left q-pa-xs"
-                            ).style(f"width: {width}; font-weight: 500"):
+                                "sc-label text-left q-pa-xs"
+                            ).style(f"width: {width}"):
                                 ui.label(label)
 
                 with ui.element("tbody"):
                     for entry in entries:
                         with ui.element("tr").classes("cursor-pointer").style(
-                            "border-bottom: 1px solid rgba(0,0,0,0.1)"
+                            "border-bottom: 1px solid var(--sc-border-light)"
                         ).on("click", lambda _e=entry: _open_detail(_e, main_container)):
                             with ui.element("td").classes("q-pa-xs"):
                                 ui.label(entry["created_at"][:10]).classes(
@@ -211,7 +214,8 @@ def _render_list(main_container: list) -> None:
 def journal_page() -> None:
     create_nav("/journal")
     with ui.column().classes("w-full").style(
-        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column"
+        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column;"
+        "background: var(--sc-content-bg)"
     ) as outer:
         main_container: list = [outer]
         _render_list(main_container)

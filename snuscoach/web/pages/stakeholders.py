@@ -222,7 +222,8 @@ def _open_detail(stakeholder_id: int, stakeholder_name: str, main_container: lis
     with main_container[0]:
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
-                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
+                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
+                "background: #fff; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_detail_left(
                     stakeholder_id, stakeholder_name, notes_container, main_container
@@ -308,12 +309,12 @@ def _render_group_table(stakeholders: list, main_container: list) -> None:
 
     with ui.element("table").classes("w-full").style(
         "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid rgba(0,0,0,0.15); border-radius: 4px"
+        "border: 1px solid var(--sc-border); border-radius: 6px; overflow: hidden"
     ):
         with ui.element("thead"):
             with ui.element("tr").style(
-                "border-bottom: 2px solid rgba(0,0,0,0.2);"
-                "background: rgba(0,0,0,0.05)"
+                "border-bottom: 1px solid var(--sc-border);"
+                "background: var(--sc-border-light)"
             ):
                 for label, width in [
                     ("Name", "35%"),
@@ -321,8 +322,8 @@ def _render_group_table(stakeholders: list, main_container: list) -> None:
                     ("Last Note", "25%"),
                 ]:
                     with ui.element("th").classes(
-                        "text-caption text-grey text-left q-pa-xs"
-                    ).style(f"width: {width}; font-weight: 500"):
+                        "sc-label text-left q-pa-xs"
+                    ).style(f"width: {width}"):
                         ui.label(label)
 
         with ui.element("tbody"):
@@ -332,7 +333,7 @@ def _render_group_table(stakeholders: list, main_container: list) -> None:
                 last_note = _extract_last_note_date(s["notes"])
 
                 with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid rgba(0,0,0,0.1)"
+                    "border-bottom: 1px solid var(--sc-border-light)"
                 ):
                     with ui.element("td").classes("q-pa-xs").on(
                         "click",
@@ -365,7 +366,9 @@ def _render_list(main_container: list) -> None:
             tier_buckets["other"].append(s)
 
     with ui.row().classes("w-full items-center justify-between q-pb-sm").style("flex-shrink: 0"):
-        ui.label("Stakeholders").classes("text-h5")
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("person", size="sm").style("color: var(--sc-accent-nudge)")
+            ui.label("Stakeholders").classes("text-h6")
         ui.button(
             "+ New Stakeholder",
             on_click=lambda: _open_new_stakeholder_dialog(main_container),
@@ -393,7 +396,8 @@ def stakeholders_page() -> None:
     create_nav("/stakeholders")
 
     with ui.column().classes("w-full q-pa-md").style(
-        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column"
+        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column;"
+        "background: var(--sc-content-bg)"
     ) as outer:
         main_container: list = [outer]
         _render_list(main_container)

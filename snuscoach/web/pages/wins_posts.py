@@ -73,7 +73,8 @@ def _open_post_detail(
     with main_container[0]:
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
-                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
+                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
+                "background: #fff; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_post_detail_left(post, win_id, win, content_ta, panel_ref, go_back_fn)
             with ui.column().classes("flex-1 h-full q-pa-sm gap-0").style(
@@ -238,7 +239,9 @@ def _render_wins_table(main_container: list) -> None:
     with ui.row().classes("w-full items-center justify-between q-pb-xs").style(
         "flex-shrink: 0"
     ):
-        ui.label("Wins").classes("text-overline text-bold q-mt-md q-mb-xs")
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("emoji_events", size="xs").style("color: var(--sc-accent-wins)")
+            ui.label("Wins").classes("sc-label q-mt-md q-mb-xs")
         ui.button(
             "+ Add Win",
             on_click=lambda: _open_add_win_dialog(main_container),
@@ -250,12 +253,12 @@ def _render_wins_table(main_container: list) -> None:
 
     with ui.element("table").classes("w-full").style(
         "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid rgba(0,0,0,0.15); border-radius: 4px"
+        "border: 1px solid var(--sc-border); border-radius: 6px; overflow: hidden"
     ):
         with ui.element("thead"):
             with ui.element("tr").style(
-                "border-bottom: 2px solid rgba(0,0,0,0.2);"
-                "background: rgba(0,0,0,0.05)"
+                "border-bottom: 1px solid var(--sc-border);"
+                "background: var(--sc-border-light)"
             ):
                 for label, width in [
                     ("Title", "22%"),
@@ -264,8 +267,8 @@ def _render_wins_table(main_container: list) -> None:
                     ("Posted", "22%"),
                 ]:
                     with ui.element("th").classes(
-                        "text-caption text-grey text-left q-pa-xs"
-                    ).style(f"width: {width}; font-weight: 500"):
+                        "sc-label text-left q-pa-xs"
+                    ).style(f"width: {width}"):
                         ui.label(label)
 
         with ui.element("tbody"):
@@ -274,7 +277,7 @@ def _render_wins_table(main_container: list) -> None:
                 has_post = wid in wins_with_posts_set
 
                 with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid rgba(0,0,0,0.1)"
+                    "border-bottom: 1px solid var(--sc-border-light)"
                 ):
                     with ui.element("td").classes("q-pa-xs").on(
                         "click", lambda _w=win: _open_detail(_w, main_container)
@@ -315,7 +318,9 @@ def _render_posts_table(main_container: list) -> None:
     with ui.row().classes("w-full items-center justify-between q-pb-xs").style(
         "flex-shrink: 0"
     ):
-        ui.label("Posts").classes("text-overline text-bold q-mt-md q-mb-xs")
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("campaign", size="xs").style("color: var(--sc-accent-meet)")
+            ui.label("Posts").classes("sc-label q-mt-md q-mb-xs")
         ui.button(
             "+ New Post",
             on_click=lambda: _open_post_detail(
@@ -329,12 +334,12 @@ def _render_posts_table(main_container: list) -> None:
 
     with ui.element("table").classes("w-full").style(
         "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid rgba(0,0,0,0.15); border-radius: 4px"
+        "border: 1px solid var(--sc-border); border-radius: 6px; overflow: hidden"
     ):
         with ui.element("thead"):
             with ui.element("tr").style(
-                "border-bottom: 2px solid rgba(0,0,0,0.2);"
-                "background: rgba(0,0,0,0.05)"
+                "border-bottom: 1px solid var(--sc-border);"
+                "background: var(--sc-border-light)"
             ):
                 for label, width in [
                     ("Channel", "22%"),
@@ -343,8 +348,8 @@ def _render_posts_table(main_container: list) -> None:
                     ("Win", "40%"),
                 ]:
                     with ui.element("th").classes(
-                        "text-caption text-grey text-left q-pa-xs"
-                    ).style(f"width: {width}; font-weight: 500"):
+                        "sc-label text-left q-pa-xs"
+                    ).style(f"width: {width}"):
                         ui.label(label)
 
         with ui.element("tbody"):
@@ -353,7 +358,7 @@ def _render_posts_table(main_container: list) -> None:
                     wins_by_id.get(post["win_id"], "—") if post["win_id"] else "—"
                 )
                 with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid rgba(0,0,0,0.1)"
+                    "border-bottom: 1px solid var(--sc-border-light)"
                 ).on(
                     "click",
                     lambda _p=post: _open_post_detail(
@@ -395,7 +400,8 @@ def _open_detail(win: dict, main_container: list, seed_prompt: str | None = None
     with main_container[0]:
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
-                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
+                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
+                "background: #fff; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_detail_left(win, desc_ta, panel_ref, main_container)
 
@@ -508,8 +514,9 @@ def _render_detail_right(
 def wins_posts_page() -> None:
     create_nav("/wins-posts")
 
-    with ui.column().classes("w-full q-pa-md").style(
-        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column"
+    with ui.column().classes("w-full").style(
+        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column;"
+        "background: var(--sc-content-bg)"
     ) as outer:
         main_container: list = [outer]
         _render_list(main_container)
