@@ -52,7 +52,7 @@ def test_upcoming_meetings_card_renders(page: Page, ui_base_url: str) -> None:
 
 def test_wins_gap_card_renders(page: Page, ui_base_url: str) -> None:
     _goto(page, f"{ui_base_url}{HOME}")
-    expect(page.locator("text=Wins without a post").first).to_be_visible()
+    expect(page.locator("text=Visibility").first).to_be_visible()
     wins_label = page.locator("text=All wins have posts.").or_(
         page.locator("text=wins with no visibility post")
     )
@@ -92,7 +92,7 @@ def test_all_three_card_headings_simultaneously_visible(
     _goto(page, f"{ui_base_url}{HOME}")
     page.wait_for_selector(".q-spinner", state="hidden", timeout=20_000)
 
-    for heading in ("Coach nudge", "Upcoming meetings", "Wins without a post"):
+    for heading in ("Coach nudge", "Upcoming meetings", "Visibility"):
         assert page.locator(f"text={heading}").first.is_visible(), (
             f'"{heading}" heading is not visible in the viewport'
         )

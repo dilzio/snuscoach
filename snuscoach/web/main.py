@@ -9,6 +9,9 @@ except ImportError:
 from nicegui import ui
 
 import snuscoach.web.pages  # noqa: F401 — registers all @ui.page routes
+from snuscoach.web.theme import apply_theme
+
+apply_theme()  # Quasar colour tokens + CSS custom properties (shared=True → index template)
 
 
 def run(port: int | None = None, show: bool = True) -> None:

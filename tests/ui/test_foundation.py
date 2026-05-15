@@ -38,7 +38,8 @@ def test_header_shows_app_name(page: Page, ui_base_url: str, path: str, _: str) 
 def test_nav_links_present(page: Page, ui_base_url: str, path: str, _: str) -> None:
     page.goto(f"{ui_base_url}{path}")
     for label in NAV_LABELS:
-        expect(page.locator(f"a:has-text('{label}')").first).to_be_visible()
+        # Nav uses styled rows (not <a> tags) — locate by visible text in the drawer
+        expect(page.locator(f".q-drawer :text('{label}')").first).to_be_visible()
 
 
 @pytest.mark.parametrize("path,_", ROUTES)
@@ -50,13 +51,13 @@ def test_no_profile_chip_shown(page: Page, ui_base_url: str, path: str, _: str) 
 
 def test_nav_home_link_navigates(page: Page, ui_base_url: str) -> None:
     page.goto(f"{ui_base_url}/meetings")
-    page.locator("a:has-text('Home')").first.click()
+    page.locator(".q-drawer :text('Home')").first.click()
     page.wait_for_url(f"{ui_base_url}/")
     expect(page.locator("text=Home").first).to_be_visible()
 
 
 def test_nav_admin_link_navigates(page: Page, ui_base_url: str) -> None:
     page.goto(f"{ui_base_url}/")
-    page.locator("a:has-text('Admin')").first.click()
+    page.locator(".q-drawer :text('Admin')").first.click()
     page.wait_for_url(f"{ui_base_url}/admin")
     expect(page.locator("text=Admin").first).to_be_visible()
