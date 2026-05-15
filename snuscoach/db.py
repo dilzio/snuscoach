@@ -720,6 +720,14 @@ def get_latest_journal_entry():
         ).fetchone()
 
 
+def update_journal_entry(entry_id: int, content: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE journal_entries SET content=?, updated_at=? WHERE id=?",
+            (content, _now(), entry_id),
+        )
+
+
 def add_nudge(date: str, report: str, gaps_json: str | None = None) -> int:
     with connect() as conn:
         cur = conn.execute(

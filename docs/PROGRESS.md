@@ -102,7 +102,7 @@ Design doc: [`docs/UI_DESIGN.md`](UI_DESIGN.md)
 | Meetings section: meeting list + series + detail view + prep/debrief chat | ✅ | `feature/meetings-ui`; UX redesigned in `feature/meetings-ux-redesign` (table list view, tabbed prep/debrief sessions, read-only AI outputs); 33 Playwright tests |
 | Stakeholders section: list by tier + detail view + add/edit + delete + contextual chat | ✅ | `feature/stakeholders-ui`; tier-grouped list, profile edit, notes log, delete with confirm, persistent chat threads; 33 Playwright tests |
 | Wins & Posts section: wins ledger + post history + AI drafting chat + save post | ✅ | `feature/wins-posts-ui`; meetings-style list→detail UX: wins table (title, description, date, posted ✓ indicator, [↗ New Post]) + posts table (channel, date, audience, win); win detail view with edit form, linked posts list, contextual chat (thread per win, no auto-LLM), Adopt AI draft button, Save Win; AI-assisted post detail view (replaces modal dialogs) with chat pre-seeded with relevant prompt for new/edit post flows; "+ Add Win" dialog opens win detail view with seeded chat; 56 Playwright tests |
-| Journal section: entry history + daily check-in chat | ❌ | |
+| Journal section: entry history + daily check-in chat | ✅ | `feature/wins-posts-ui`; meetings-style list→detail UX: entry table (date, type badge, content preview) + two-column detail view (content textarea, Adopt transcript, Save Entry); chat pre-seeded with journal_opening_prompt() for new entries, persistent thread per entry for existing; 20 Playwright tests |
 | Admin section: profile list/edit + voice samples | ❌ | |
 | Integration tests for web pages (NiceGUI test client) | ❌ | |
 
