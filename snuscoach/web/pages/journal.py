@@ -54,7 +54,7 @@ def _open_detail(entry: dict | None, main_container: list) -> None:
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
                 "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
-                "background: #fff; border-right: 1px solid var(--sc-border)"
+                "background: #fafafa; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_detail_left(entry, content_ta, panel_ref, _go_back)
 
@@ -70,7 +70,7 @@ def _render_detail_left(
     panel_ref: list,
     go_back_fn,
 ) -> None:
-    ui.button("← Back", on_click=go_back_fn).props("flat dense").classes("q-mb-sm")
+    ui.button("Back", on_click=go_back_fn).props("flat dense icon=chevron_left").classes("q-mb-sm text-grey")
     ui.label("Entry Details").classes("text-subtitle2 text-bold q-mb-xs")
 
     date_str = entry["created_at"][:10] if entry else date.today().isoformat()
@@ -107,7 +107,7 @@ def _render_detail_left(
             db.add_journal_entry(content, coach_prompt=coach_opening, entry_type="journal")
             go_back_fn()
 
-    ui.button("Save Entry", on_click=_save).props("color=primary dense").classes("q-mt-xs")
+    ui.button("Save Entry", on_click=_save).props("unelevated dense color=primary size=sm").classes("q-mt-xs")
 
 
 def _render_detail_right(
@@ -150,60 +150,39 @@ def _refresh_list(main_container: list) -> None:
 def _render_list(main_container: list) -> None:
     entries = db.list_journal_entries(limit=50)
 
+    with ui.row().classes("w-full items-center justify-between sc-page-header"):
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("book", size="sm").style("color: var(--sc-accent-nudge)")
+            ui.label("Journal").classes("sc-page-title")
+        ui.button(
+            "+ New Entry",
+            on_click=lambda: _open_detail(None, main_container),
+        ).props("unelevated dense").classes("bg-primary text-white text-caption")
+
+    if not entries:
+        with ui.column().classes("w-full q-pa-md"):
+            ui.label("No entries yet.").classes("text-caption text-grey")
+        return
+
     with ui.scroll_area().classes("w-full").style("flex: 1"):
-        with ui.column().classes("w-full q-pa-md gap-2"):
-            with ui.row().classes("w-full items-center justify-between q-pb-xs").style(
-                "flex-shrink: 0"
-            ):
-                with ui.row().classes("items-center gap-2"):
-                    ui.icon("book", size="xs").style("color: var(--sc-accent-nudge)")
-                    ui.label("Journal").classes("sc-label q-mt-md q-mb-xs")
-                ui.button(
-                    "+ New Entry",
-                    on_click=lambda: _open_detail(None, main_container),
-                ).props("flat dense")
-
-            if not entries:
-                ui.label("No entries yet.").classes("text-caption text-grey q-mt-xs")
-                return
-
-            with ui.element("table").classes("w-full").style(
-                "border-collapse: collapse; table-layout: fixed;"
-                "border: 1px solid var(--sc-border); border-radius: 6px; overflow: hidden"
-            ):
-                with ui.element("thead"):
-                    with ui.element("tr").style(
-                        "border-bottom: 1px solid var(--sc-border);"
-                        "background: var(--sc-border-light)"
-                    ):
-                        for label, width in [
-                            ("Date", "18%"),
-                            ("Type", "15%"),
-                            ("Preview", "67%"),
-                        ]:
-                            with ui.element("th").classes(
-                                "sc-label text-left q-pa-xs"
-                            ).style(f"width: {width}"):
-                                ui.label(label)
-
-                with ui.element("tbody"):
-                    for entry in entries:
-                        with ui.element("tr").classes("cursor-pointer").style(
-                            "border-bottom: 1px solid var(--sc-border-light)"
-                        ).on("click", lambda _e=entry: _open_detail(_e, main_container)):
-                            with ui.element("td").classes("q-pa-xs"):
-                                ui.label(entry["created_at"][:10]).classes(
-                                    "text-caption text-grey"
-                                )
-                            with ui.element("td").classes("q-pa-xs"):
-                                ui.badge(
-                                    entry["entry_type"] or "journal",
-                                    color="primary" if (entry["entry_type"] or "journal") == "journal" else "secondary",
-                                ).props("outline")
-                            with ui.element("td").classes("q-pa-xs"):
-                                ui.label(_truncate(entry["content"])).classes(
-                                    "text-caption text-grey"
-                                )
+        with ui.element("table").classes("sc-table w-full"):
+            with ui.element("thead"):
+                with ui.element("tr"):
+                    for label, width in [("Date", "18%"), ("Type", "15%"), ("Preview", "67%")]:
+                        with ui.element("th").style(f"width: {width}"):
+                            ui.label(label)
+            with ui.element("tbody"):
+                for entry in entries:
+                    with ui.element("tr").classes("sc-tr-click cursor-pointer"):
+                        with ui.element("td").on("click", lambda _e=entry: _open_detail(_e, main_container)):
+                            ui.label(entry["created_at"][:10]).classes("text-caption text-grey")
+                        with ui.element("td").on("click", lambda _e=entry: _open_detail(_e, main_container)):
+                            ui.badge(
+                                entry["entry_type"] or "journal",
+                                color="primary" if (entry["entry_type"] or "journal") == "journal" else "secondary",
+                            ).props("outline")
+                        with ui.element("td").on("click", lambda _e=entry: _open_detail(_e, main_container)):
+                            ui.label(_truncate(entry["content"])).classes("text-caption text-grey")
 
 
 # ---------------------------------------------------------------------------
@@ -214,8 +193,8 @@ def _render_list(main_container: list) -> None:
 def journal_page() -> None:
     create_nav("/journal")
     with ui.column().classes("w-full").style(
-        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column;"
-        "background: var(--sc-content-bg)"
+        "height: calc(100vh - 56px); overflow: hidden; display: flex; flex-direction: column;"
+        "background: #fff"
     ) as outer:
         main_container: list = [outer]
         _render_list(main_container)

@@ -134,6 +134,26 @@ _CSS = """
 .sc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .sc-dot--on  { background: var(--q-color-positive); }
 .sc-dot--off { background: #e2e8f0; border: 1.5px solid #cbd5e1; }
+
+/* Page-header title — 19px/600 matching mockup .page-title */
+.sc-page-title {
+  font-size: 19px !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  line-height: 1.2 !important;
+}
+
+/* Chat message bubbles */
+.q-message-text-content { font-size: 13.5px !important; line-height: 1.5 !important; }
+.q-message-name { font-size: 10px !important; color: var(--sc-text-muted) !important; }
+.q-message-text-content--sent {
+  background: var(--q-color-primary) !important;
+  color: #fff !important;
+}
+.q-message-text-content--received {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
 """
 
 

@@ -541,7 +541,7 @@ def _render_list(main_container: list) -> None:
     with ui.row().classes("w-full items-center justify-between sc-page-header"):
         with ui.row().classes("items-center gap-2"):
             ui.icon("groups", size="sm").style("color: var(--sc-accent-meet)")
-            ui.label("Meetings").classes("text-subtitle1 text-bold")
+            ui.label("Meetings").classes("sc-page-title")
         ui.button(
             "+ New Meeting",
             on_click=lambda: _open_new_meeting_dialog(main_container),

@@ -160,7 +160,7 @@ def _render_detail_left(
         with main_container[0]:
             _render_list(main_container)
 
-    ui.button("← Back", on_click=_go_back).props("flat dense").classes("q-mb-sm")
+    ui.button("Back", on_click=_go_back).props("flat dense icon=chevron_left").classes("q-mb-sm text-grey")
 
     # --- Profile section ---
     ui.separator().classes("q-my-xs")
@@ -193,7 +193,7 @@ def _render_detail_left(
         )
         ui.notify("Profile saved.")
 
-    ui.button("Save ↑", on_click=_save_profile).props("color=primary dense").classes("q-mt-sm")
+    ui.button("Save ↑", on_click=_save_profile).props("unelevated dense color=primary size=sm").classes("q-mt-sm")
 
     # --- Notes section ---
     ui.separator().classes("q-my-sm")
@@ -223,7 +223,7 @@ def _open_detail(stakeholder_id: int, stakeholder_name: str, main_container: lis
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
                 "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
-                "background: #fff; border-right: 1px solid var(--sc-border)"
+                "background: #fafafa; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_detail_left(
                     stakeholder_id, stakeholder_name, notes_container, main_container
@@ -303,59 +303,32 @@ def _open_new_stakeholder_dialog(main_container: list) -> None:
 # List view (full-width table grouped by tier)
 # ---------------------------------------------------------------------------
 
-def _render_group_table(stakeholders: list, main_container: list) -> None:
-    if not stakeholders:
-        return
-
-    with ui.element("table").classes("w-full").style(
-        "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid var(--sc-border); border-radius: 6px; overflow: hidden"
-    ):
-        with ui.element("thead"):
-            with ui.element("tr").style(
-                "border-bottom: 1px solid var(--sc-border);"
-                "background: var(--sc-border-light)"
+def _render_stakeholder_rows(stakeholders: list, main_container: list) -> None:
+    for s in stakeholders:
+        sid = s["id"]
+        sname = s["name"]
+        last_note = _extract_last_note_date(s["notes"])
+        with ui.element("tr").classes("sc-tr-click cursor-pointer"):
+            with ui.element("td").on(
+                "click",
+                lambda _sid=sid, _sname=sname: _open_detail(_sid, _sname, main_container),
             ):
-                for label, width in [
-                    ("Name", "35%"),
-                    ("Role", "40%"),
-                    ("Last Note", "25%"),
-                ]:
-                    with ui.element("th").classes(
-                        "sc-label text-left q-pa-xs"
-                    ).style(f"width: {width}"):
-                        ui.label(label)
-
-        with ui.element("tbody"):
-            for s in stakeholders:
-                sid = s["id"]
-                sname = s["name"]
-                last_note = _extract_last_note_date(s["notes"])
-
-                with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid var(--sc-border-light)"
-                ):
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click",
-                        lambda _sid=sid, _sname=sname: _open_detail(_sid, _sname, main_container),
-                    ):
-                        ui.label(sname).classes("text-body2 text-bold cursor-pointer")
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click",
-                        lambda _sid=sid, _sname=sname: _open_detail(_sid, _sname, main_container),
-                    ):
-                        ui.label(s["role"] or "—").classes("text-caption")
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click",
-                        lambda _sid=sid, _sname=sname: _open_detail(_sid, _sname, main_container),
-                    ):
-                        ui.label(last_note).classes("text-caption text-grey")
+                ui.label(sname).classes("text-bold")
+            with ui.element("td").on(
+                "click",
+                lambda _sid=sid, _sname=sname: _open_detail(_sid, _sname, main_container),
+            ):
+                ui.label(s["role"] or "—").classes("text-caption text-grey")
+            with ui.element("td").on(
+                "click",
+                lambda _sid=sid, _sname=sname: _open_detail(_sid, _sname, main_container),
+            ):
+                ui.label(last_note).classes("text-caption text-grey")
 
 
 def _render_list(main_container: list) -> None:
     stakeholders = db.list_stakeholders()
 
-    # Group by tier; unclassified / unknown tier → "other"
     tier_buckets: dict = {t: [] for t in VALID_TIERS}
     for s in stakeholders:
         rel = s["relationship"]
@@ -365,26 +338,36 @@ def _render_list(main_container: list) -> None:
         else:
             tier_buckets["other"].append(s)
 
-    with ui.row().classes("w-full items-center justify-between q-pb-sm").style("flex-shrink: 0"):
+    with ui.row().classes("w-full items-center justify-between sc-page-header"):
         with ui.row().classes("items-center gap-2"):
             ui.icon("person", size="sm").style("color: var(--sc-accent-nudge)")
-            ui.label("Stakeholders").classes("text-h6")
+            ui.label("Stakeholders").classes("sc-page-title")
         ui.button(
             "+ New Stakeholder",
             on_click=lambda: _open_new_stakeholder_dialog(main_container),
-        ).props("flat dense")
+        ).props("unelevated dense").classes("bg-primary text-white text-caption")
 
     if not stakeholders:
-        ui.label("No stakeholders yet.").classes("text-caption text-grey q-mt-sm")
+        with ui.column().classes("w-full q-pa-md"):
+            ui.label("No stakeholders yet.").classes("text-caption text-grey")
         return
 
     with ui.scroll_area().classes("w-full").style("flex: 1"):
-        for tier in VALID_TIERS:
-            group = tier_buckets[tier]
-            if not group:
-                continue
-            ui.label(tier.upper()).classes("text-overline text-bold q-mt-md q-mb-xs")
-            _render_group_table(group, main_container)
+        with ui.element("table").classes("sc-table w-full"):
+            with ui.element("thead"):
+                with ui.element("tr"):
+                    for label, width in [("Name", "35%"), ("Role", "40%"), ("Last Note", "25%")]:
+                        with ui.element("th").style(f"width: {width}"):
+                            ui.label(label)
+            with ui.element("tbody"):
+                for tier in VALID_TIERS:
+                    group = tier_buckets[tier]
+                    if not group:
+                        continue
+                    with ui.element("tr").classes("sc-tr-section"):
+                        with ui.element("td").props('colspan="3"'):
+                            ui.label(tier)
+                    _render_stakeholder_rows(group, main_container)
 
 
 # ---------------------------------------------------------------------------
@@ -395,9 +378,9 @@ def _render_list(main_container: list) -> None:
 def stakeholders_page() -> None:
     create_nav("/stakeholders")
 
-    with ui.column().classes("w-full q-pa-md").style(
-        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column;"
-        "background: var(--sc-content-bg)"
+    with ui.column().classes("w-full").style(
+        "height: calc(100vh - 56px); overflow: hidden; display: flex; flex-direction: column;"
+        "background: #fff"
     ) as outer:
         main_container: list = [outer]
         _render_list(main_container)

@@ -147,7 +147,7 @@ def test_add_entry_back_returns_to_list(page: Page, ui_base_url: str) -> None:
     _goto(page, f"{ui_base_url}{JOURNAL}")
     page.locator("button:has-text('+ New Entry')").first.click()
     page.wait_for_timeout(400)
-    page.locator("button:has-text('← Back')").first.click()
+    page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(400)
     expect(page.locator("button:has-text('+ New Entry')").first).to_be_visible()
 
@@ -235,7 +235,7 @@ def test_detail_back_returns_to_list(
     _goto(page, f"{ui_base_url}{JOURNAL}")
     page.locator("td").filter(has_text="coach: What's on your mind today").first.click()
     page.wait_for_timeout(400)
-    page.locator("button:has-text('← Back')").first.click()
+    page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(400)
     expect(page.locator("button:has-text('+ New Entry')").first).to_be_visible()
 

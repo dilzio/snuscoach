@@ -74,7 +74,7 @@ class ChatPanel:
                 )
                 with self._empty_el:
                     ui.icon("chat_bubble_outline").style("font-size: 48px; color: #e2e8f0")
-                    ui.label(self.empty_state).classes("text-center text-caption text-grey-5")
+                    ui.label(self.empty_state).classes("text-center text-grey-5").style("font-size: 15px; line-height: 1.6; white-space: pre-line")
                 self._empty_el.set_visibility(show_empty)
             else:
                 self._empty_el = None
@@ -90,7 +90,7 @@ class ChatPanel:
                 self.input = ui.input(placeholder=self.placeholder).classes(
                     "flex-1"
                 ).props("outlined dense")
-                ui.button("Send", on_click=self._on_send).props("dense")
+                ui.button("Send", on_click=self._on_send).props("unelevated dense color=primary")
 
         self.input.on("keydown.enter", self._on_send)
         if self.messages:
