@@ -40,7 +40,26 @@ def isolated_profile_env(monkeypatch):
     """
     monkeypatch.delenv("SNUSCOACH_PROFILE", raising=False)
 
+@pytest.fixture(autouse=True)
+def isolated_llm_stub_env(monkeypatch):
+    """Always clear local LLM stub settings so .env values don't bleed into tests.
 
+    Tests that verify stub behavior should opt in explicitly with
+    monkeypatch.setenv(...). This keeps tests that monkeypatch coach.conversation
+    or coach.draft from being bypassed by SNUSCOACH_STUB_* flags loaded from .env.
+    """
+    for name in (
+        "SNUSCOACH_STUB_CHAT",
+        "SNUSCOACH_STUB_POST_DRAFT",
+        "SNUSCOACH_STUB_MEETING_PREP",
+        "SNUSCOACH_STUB_MEETING_DEBRIEF",
+        "SNUSCOACH_STUB_JOURNAL",
+        "SNUSCOACH_STUB_REFLECT",
+        "SNUSCOACH_STUB_NUDGE_INTERACTIVE",
+        "SNUSCOACH_STUB_NUDGE_REPORT",
+        "SNUSCOACH_NUDGE_MODE",
+    ):
+        monkeypatch.delenv(name, raising=False)
 @pytest.fixture
 def temp_db(temp_db_path):
     """Initialized temp DB. Most tests use this."""

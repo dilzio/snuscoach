@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 import pytest
 import requests
@@ -78,3 +77,71 @@ def ui_base_url(ui_server):
 @pytest.fixture
 def ui_db_path(ui_server):
     return ui_server[1]
+
+
+@pytest.fixture(autouse=True)
+def temp_db_path(monkeypatch, tmp_path):
+    """Always isolate every test to a per-test temp DB.
+
+    Does NOT initialize the schema — tests that want a clean initialized DB
+    should request the `temp_db` fixture instead. Tests that exercise the
+    migration path use this fixture directly and seed an old-schema DB
+    manually before calling init_db().
+    """
+    db_path = tmp_path / "snuscoach.db"
+    monkeypatch.setenv("SNUSCOACH_DB", str(db_path))
+    yield db_path
+
+
+@pytest.fixture(autouse=True)
+def isolated_logger(monkeypatch, tmp_path):
+    """Always isolate logger state and log dir per-test.
+
+    Points SNUSCOACH_LOG_DIR at a per-test tmp dir and resets the logger's
+    process-scoped command + session-file cache before and after each test
+    so writes never leak between tests or to ~/.snuscoach/logs.
+    """
+    monkeypatch.setenv("SNUSCOACH_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.delenv("SNUSCOACH_LOG", raising=False)  # default-on
+    from snuscoach import logger
+
+    logger._reset_for_tests()
+    yield
+    logger._reset_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def isolated_profile_env(monkeypatch):
+    """Always clear SNUSCOACH_PROFILE so .env values don't bleed into tests.
+
+    Tests that need a specific profile name can override it via monkeypatch.setenv.
+    """
+    monkeypatch.delenv("SNUSCOACH_PROFILE", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def isolated_stub_env(monkeypatch):
+    """Always clear LLM stub flags so .env values don't bleed into tests.
+
+    Tests that verify stub behavior should opt in with monkeypatch.setenv.
+    """
+    for name in (
+        "SNUSCOACH_STUB_CHAT",
+        "SNUSCOACH_STUB_POST_DRAFT",
+        "SNUSCOACH_STUB_MEETING_PREP",
+        "SNUSCOACH_STUB_MEETING_DEBRIEF",
+        "SNUSCOACH_STUB_JOURNAL",
+        "SNUSCOACH_STUB_REFLECT",
+        "SNUSCOACH_STUB_NUDGE_INTERACTIVE",
+        "SNUSCOACH_STUB_NUDGE_REPORT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture
+def temp_db(temp_db_path):
+    """Initialized temp DB. Most tests use this."""
+    from snuscoach import db
+
+    db.init_db()
+    yield temp_db_path
