@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -6,9 +7,14 @@ try:
 except ImportError:
     pass
 
-from nicegui import ui
+from nicegui import app, ui
+
+app.add_static_files("/static", Path(__file__).parent / "static")
 
 import snuscoach.web.pages  # noqa: F401 — registers all @ui.page routes
+from snuscoach.web.theme import apply_theme
+
+apply_theme()  # Quasar colour tokens + CSS custom properties (shared=True → index template)
 
 
 def run(port: int | None = None, show: bool = True) -> None:

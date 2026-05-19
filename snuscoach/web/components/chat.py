@@ -19,9 +19,11 @@ class ChatPanel:
         placeholder: str = "What's on your mind?",
         coach_fn: Callable | None = None,
         thread_key: str | None = None,
+        empty_state: str | None = None,
     ) -> None:
         self.placeholder = placeholder
         self.coach_fn = coach_fn
+        self.empty_state = empty_state
         self.thread_id: int | None = None
         self.messages: list[dict] = []
 
@@ -63,7 +65,22 @@ class ChatPanel:
 
     def _build(self) -> None:
         with ui.column().classes("w-full h-full gap-0"):
+            show_empty = not self.messages and self.empty_state is not None
+            if self.empty_state is not None:
+                self._empty_el: ui.column | None = (
+                    ui.column()
+                    .classes("flex-1 items-center justify-center gap-3")
+                    .style("padding: 40px 20px")
+                )
+                with self._empty_el:
+                    ui.icon("chat_bubble_outline").style("font-size: 48px; color: #e2e8f0")
+                    ui.label(self.empty_state).classes("text-center text-grey-5").style("font-size: 15px; line-height: 1.6; white-space: pre-line")
+                self._empty_el.set_visibility(show_empty)
+            else:
+                self._empty_el = None
+
             self.scroll = ui.scroll_area().classes("flex-1 w-full")
+            self.scroll.set_visibility(not show_empty)
             with self.scroll:
                 self.chat_column = ui.column().classes("w-full gap-2 q-pa-md")
                 for msg in self.messages:
@@ -73,7 +90,7 @@ class ChatPanel:
                 self.input = ui.input(placeholder=self.placeholder).classes(
                     "flex-1"
                 ).props("outlined dense")
-                ui.button("Send", on_click=self._on_send).props("dense")
+                ui.button("Send", on_click=self._on_send).props("unelevated dense color=primary")
 
         self.input.on("keydown.enter", self._on_send)
         if self.messages:
@@ -84,6 +101,10 @@ class ChatPanel:
         if not text:
             return
         self.input.value = ""
+        if self._empty_el is not None:
+            self._empty_el.set_visibility(False)
+            self.scroll.set_visibility(True)
+            self._empty_el = None
         self.messages.append({"role": "user", "content": text})
         self._render_message("user", text)
         await self._get_reply()

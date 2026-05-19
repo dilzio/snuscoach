@@ -73,7 +73,8 @@ def _open_post_detail(
     with main_container[0]:
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
-                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
+                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
+                "background: #fafafa; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_post_detail_left(post, win_id, win, content_ta, panel_ref, go_back_fn)
             with ui.column().classes("flex-1 h-full q-pa-sm gap-0").style(
@@ -90,7 +91,7 @@ def _render_post_detail_left(
     panel_ref: list,
     go_back_fn,
 ) -> None:
-    ui.button("← Back", on_click=go_back_fn).props("flat dense").classes("q-mb-sm")
+    ui.button("Back", on_click=go_back_fn).props("flat dense icon=chevron_left").classes("q-mb-sm text-grey")
 
     ui.label("Post Details").classes("text-subtitle2 text-bold q-mb-xs")
 
@@ -145,7 +146,7 @@ def _render_post_detail_left(
             )
             go_back_fn()
 
-    ui.button("Save Post", on_click=_save).props("color=primary dense").classes("q-mt-xs")
+    ui.button("Save Post", on_click=_save).props("unelevated dense color=primary size=sm").classes("q-mt-xs")
 
 
 def _render_post_detail_right(
@@ -235,75 +236,35 @@ def _render_wins_table(main_container: list) -> None:
     wins = db.list_wins()
     wins_with_posts_set = _wins_with_posts()
 
-    with ui.row().classes("w-full items-center justify-between q-pb-xs").style(
-        "flex-shrink: 0"
-    ):
-        ui.label("Wins").classes("text-overline text-bold q-mt-md q-mb-xs")
-        ui.button(
-            "+ Add Win",
-            on_click=lambda: _open_add_win_dialog(main_container),
-        ).props("flat dense")
-
     if not wins:
-        ui.label("No wins yet.").classes("text-caption text-grey q-mt-xs q-mb-md")
+        ui.label("No wins yet.").classes("text-caption text-grey q-px-md q-py-sm")
         return
 
-    with ui.element("table").classes("w-full").style(
-        "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid rgba(0,0,0,0.15); border-radius: 4px"
-    ):
+    with ui.element("table").classes("sc-table w-full"):
         with ui.element("thead"):
-            with ui.element("tr").style(
-                "border-bottom: 2px solid rgba(0,0,0,0.2);"
-                "background: rgba(0,0,0,0.05)"
-            ):
-                for label, width in [
-                    ("Title", "22%"),
-                    ("Description", "43%"),
-                    ("Date", "13%"),
-                    ("Posted", "22%"),
-                ]:
-                    with ui.element("th").classes(
-                        "text-caption text-grey text-left q-pa-xs"
-                    ).style(f"width: {width}; font-weight: 500"):
+            with ui.element("tr"):
+                for label, width in [("Title", "22%"), ("Description", "43%"), ("Date", "13%"), ("Posted", "22%")]:
+                    with ui.element("th").style(f"width: {width}"):
                         ui.label(label)
-
         with ui.element("tbody"):
             for win in wins:
                 wid = win["id"]
                 has_post = wid in wins_with_posts_set
-
-                with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid rgba(0,0,0,0.1)"
-                ):
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click", lambda _w=win: _open_detail(_w, main_container)
-                    ):
-                        ui.label(win["title"]).classes("text-body2 text-bold")
-
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click", lambda _w=win: _open_detail(_w, main_container)
-                    ):
-                        ui.label(_truncate(win["description"] or "—")).classes(
-                            "text-caption text-grey"
-                        )
-
-                    with ui.element("td").classes("q-pa-xs").on(
-                        "click", lambda _w=win: _open_detail(_w, main_container)
-                    ):
+                with ui.element("tr").classes("sc-tr-click cursor-pointer"):
+                    with ui.element("td").on("click", lambda _w=win: _open_detail(_w, main_container)):
+                        ui.label(win["title"]).classes("text-bold")
+                    with ui.element("td").on("click", lambda _w=win: _open_detail(_w, main_container)):
+                        ui.label(_truncate(win["description"] or "—")).classes("text-caption text-grey")
+                    with ui.element("td").on("click", lambda _w=win: _open_detail(_w, main_container)):
                         ui.label(win["created_at"][:10]).classes("text-caption text-grey")
-
-                    with ui.element("td").classes("q-pa-xs"):
+                    with ui.element("td"):
                         with ui.row().classes("gap-1 items-center no-wrap"):
                             if has_post:
                                 ui.label("✓").classes("text-positive text-body2")
                             ui.button(
                                 "↗ New Post",
                                 on_click=lambda _wid=wid: _open_post_detail(
-                                    None,
-                                    _wid,
-                                    lambda: _refresh_list(main_container),
-                                    main_container,
+                                    None, _wid, lambda: _refresh_list(main_container), main_container,
                                 ),
                             ).props("flat dense size=xs")
 
@@ -312,73 +273,59 @@ def _render_posts_table(main_container: list) -> None:
     posts = db.list_posts()
     wins_by_id = {w["id"]: w["title"] for w in db.list_wins()}
 
-    with ui.row().classes("w-full items-center justify-between q-pb-xs").style(
-        "flex-shrink: 0"
-    ):
-        ui.label("Posts").classes("text-overline text-bold q-mt-md q-mb-xs")
-        ui.button(
-            "+ New Post",
-            on_click=lambda: _open_post_detail(
-                None, None, lambda: _refresh_list(main_container), main_container
-            ),
-        ).props("flat dense")
-
     if not posts:
-        ui.label("No posts yet.").classes("text-caption text-grey q-mt-xs")
+        ui.label("No posts yet.").classes("text-caption text-grey q-px-md q-py-sm")
         return
 
-    with ui.element("table").classes("w-full").style(
-        "border-collapse: collapse; table-layout: fixed;"
-        "border: 1px solid rgba(0,0,0,0.15); border-radius: 4px"
-    ):
+    with ui.element("table").classes("sc-table w-full"):
         with ui.element("thead"):
-            with ui.element("tr").style(
-                "border-bottom: 2px solid rgba(0,0,0,0.2);"
-                "background: rgba(0,0,0,0.05)"
-            ):
-                for label, width in [
-                    ("Channel", "22%"),
-                    ("Date", "13%"),
-                    ("Audience", "25%"),
-                    ("Win", "40%"),
-                ]:
-                    with ui.element("th").classes(
-                        "text-caption text-grey text-left q-pa-xs"
-                    ).style(f"width: {width}; font-weight: 500"):
+            with ui.element("tr"):
+                for label, width in [("Channel", "22%"), ("Date", "13%"), ("Audience", "25%"), ("Win", "40%")]:
+                    with ui.element("th").style(f"width: {width}"):
                         ui.label(label)
-
         with ui.element("tbody"):
             for post in posts:
-                linked_win = (
-                    wins_by_id.get(post["win_id"], "—") if post["win_id"] else "—"
-                )
-                with ui.element("tr").classes("cursor-pointer").style(
-                    "border-bottom: 1px solid rgba(0,0,0,0.1)"
-                ).on(
-                    "click",
-                    lambda _p=post: _open_post_detail(
-                        _p,
-                        _p["win_id"],
-                        lambda: _refresh_list(main_container),
-                        main_container,
-                    ),
-                ):
-                    with ui.element("td").classes("q-pa-xs"):
-                        ui.label(post["channel"]).classes("text-body2 text-bold")
-                    with ui.element("td").classes("q-pa-xs"):
+                linked_win = wins_by_id.get(post["win_id"], "—") if post["win_id"] else "—"
+                with ui.element("tr").classes("sc-tr-click cursor-pointer"):
+                    with ui.element("td").on("click", lambda _p=post: _open_post_detail(_p, _p["win_id"], lambda: _refresh_list(main_container), main_container)):
+                        ui.label(post["channel"]).classes("text-bold")
+                    with ui.element("td").on("click", lambda _p=post: _open_post_detail(_p, _p["win_id"], lambda: _refresh_list(main_container), main_container)):
                         ui.label(post["posted_at"]).classes("text-caption text-grey")
-                    with ui.element("td").classes("q-pa-xs"):
+                    with ui.element("td").on("click", lambda _p=post: _open_post_detail(_p, _p["win_id"], lambda: _refresh_list(main_container), main_container)):
                         ui.label(post["audience"] or "—").classes("text-caption text-grey")
-                    with ui.element("td").classes("q-pa-xs"):
+                    with ui.element("td").on("click", lambda _p=post: _open_post_detail(_p, _p["win_id"], lambda: _refresh_list(main_container), main_container)):
                         ui.label(_truncate(linked_win, 50)).classes("text-caption text-grey")
 
 
 def _render_list(main_container: list) -> None:
+    with ui.row().classes("w-full items-center justify-between sc-page-header"):
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("workspace_premium", size="sm").style("color: var(--sc-accent-wins)")
+            ui.label("Wins & Posts").classes("sc-page-title")
+        ui.button(
+            "+ Add Win",
+            on_click=lambda: _open_add_win_dialog(main_container),
+        ).props("unelevated dense").classes("bg-primary text-white text-caption")
+
     with ui.scroll_area().classes("w-full").style("flex: 1"):
-        with ui.column().classes("w-full q-pa-md gap-2"):
-            _render_wins_table(main_container)
-            ui.separator().classes("q-my-sm")
-            _render_posts_table(main_container)
+        with ui.row().classes("items-center gap-2 q-px-md q-pt-md q-pb-xs"):
+            ui.icon("emoji_events", size="xs").style("color: var(--sc-accent-wins)")
+            ui.label("Wins").classes("sc-label")
+        _render_wins_table(main_container)
+
+        ui.separator()
+
+        with ui.row().classes("items-center justify-between q-px-md q-pt-sm q-pb-xs"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("campaign", size="xs").style("color: var(--sc-accent-meet)")
+                ui.label("Posts").classes("sc-label")
+            ui.button(
+                "+ New Post",
+                on_click=lambda: _open_post_detail(
+                    None, None, lambda: _refresh_list(main_container), main_container
+                ),
+            ).props("flat dense size=sm")
+        _render_posts_table(main_container)
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +342,8 @@ def _open_detail(win: dict, main_container: list, seed_prompt: str | None = None
     with main_container[0]:
         with ui.row().classes("w-full gap-0").style("height: 100%; overflow: hidden"):
             with ui.column().style(
-                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0"
+                "width: 40%; height: 100%; overflow-y: auto; flex-shrink: 0;"
+                "background: #fafafa; border-right: 1px solid var(--sc-border)"
             ).classes("q-pa-md gap-1"):
                 _render_detail_left(win, desc_ta, panel_ref, main_container)
 
@@ -417,7 +365,7 @@ def _render_detail_left(
         with main_container[0]:
             _render_list(main_container)
 
-    ui.button("← Back", on_click=_go_back).props("flat dense").classes("q-mb-sm")
+    ui.button("Back", on_click=_go_back).props("flat dense icon=chevron_left").classes("q-mb-sm text-grey")
 
     ui.label("Win Details").classes("text-subtitle2 text-bold q-mb-xs")
     title_in = ui.input(label="Title", value=win["title"]).classes("w-full")
@@ -434,7 +382,7 @@ def _render_detail_left(
         db.update_win(win["id"], title, desc_ta[0].value.strip() or None)
         ui.notify("Win saved.")
 
-    ui.button("Save Win", on_click=_save_win).props("color=primary dense").classes(
+    ui.button("Save Win", on_click=_save_win).props("unelevated dense color=primary size=sm").classes(
         "q-mt-xs"
     )
     ui.label(f"Created: {win['created_at'][:10]}").classes(
@@ -508,8 +456,9 @@ def _render_detail_right(
 def wins_posts_page() -> None:
     create_nav("/wins-posts")
 
-    with ui.column().classes("w-full q-pa-md").style(
-        "height: calc(100vh - 56px); overflow-y: auto; display: flex; flex-direction: column"
+    with ui.column().classes("w-full").style(
+        "height: calc(100vh - 56px); overflow: hidden; display: flex; flex-direction: column;"
+        "background: #fff"
     ) as outer:
         main_container: list = [outer]
         _render_list(main_container)

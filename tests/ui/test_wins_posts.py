@@ -338,7 +338,7 @@ def test_new_post_back_returns_to_list(page: Page, ui_base_url: str) -> None:
     _goto(page, f"{ui_base_url}{WINS_POSTS}")
     page.locator("button:has-text('+ New Post')").first.click()
     page.wait_for_timeout(400)
-    page.locator("button:has-text('← Back')").first.click()
+    page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(400)
     expect(page.locator("button:has-text('+ Add Win')").first).to_be_visible()
 
@@ -517,7 +517,7 @@ def test_post_detail_back_returns_to_list(
     _goto(page, f"{ui_base_url}{WINS_POSTS}")
     page.locator("td").filter(has_text="slack-eng").first.click()
     page.wait_for_timeout(400)
-    page.locator("button:has-text('← Back')").first.click()
+    page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(400)
     expect(page.locator("button:has-text('+ Add Win')").first).to_be_visible()
 
@@ -578,7 +578,7 @@ def test_detail_back_button_returns_to_list(
     _goto(page, f"{ui_base_url}{WINS_POSTS}")
     page.locator("td").filter(has_text="Shipped X").first.click()
     page.wait_for_timeout(400)
-    page.locator("button:has-text('← Back')").first.click()
+    page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(400)
     expect(page.locator("button:has-text('+ Add Win')").first).to_be_visible()
 
@@ -719,7 +719,7 @@ def test_detail_linked_post_back_returns_to_win_detail(
     page.wait_for_timeout(400)
     page.locator("text=slack-linked").first.click()
     page.wait_for_timeout(400)
-    page.locator("button:has-text('← Back')").first.click()
+    page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(400)
     expect(page.locator("text=Win Details").first).to_be_visible()
 
@@ -763,7 +763,7 @@ def test_detail_new_post_for_win_back_returns_to_win_detail(
     page.wait_for_timeout(400)
     page.locator("button:has-text('+ New Post for Win')").first.click()
     page.wait_for_timeout(400)
-    page.locator("button:has-text('← Back')").first.click()
+    page.locator("button:has-text('Back')").first.click()
     page.wait_for_timeout(400)
     expect(page.locator("text=Win Details").first).to_be_visible()
 
