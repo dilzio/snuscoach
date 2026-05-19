@@ -44,12 +44,11 @@ _CSS = """
 .sc-card--wins.q-card   { border-left: 3px solid var(--sc-accent-wins); }
 .sc-card--wins-ok.q-card { border-left: 3px solid var(--q-color-positive); }
 
-/* Uniform uppercase label used on all card headers */
+/* Card header label */
 .sc-label {
   font-size: 11px !important;
   font-weight: 600 !important;
-  letter-spacing: 0.08em !important;
-  text-transform: uppercase !important;
+  letter-spacing: 0.03em !important;
   color: var(--sc-label-color) !important;
   line-height: 1.2 !important;
 }
@@ -192,6 +191,15 @@ _CSS = """
   color: #0f172a !important;
   border: none !important;
   outline: none !important;
+}
+
+/* Quasar buttons: no uppercase */
+.q-btn { text-transform: none !important; letter-spacing: normal !important; }
+
+/* Outlined inputs: thin 1px border in all states */
+.q-field--outlined .q-field__control:before,
+.q-field--outlined.q-field--focused .q-field__control:after {
+  border-width: 1px !important;
 }
 """
 
