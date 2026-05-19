@@ -54,12 +54,45 @@ _CSS = """
   line-height: 1.2 !important;
 }
 
-/* Downsize any H1 that the nudge markdown might render */
+/* Nudge markdown — small, clean, consistent across all elements */
+.sc-nudge-md { font-size: 13px !important; line-height: 1.4 !important; }
 .sc-nudge-md h1 {
-  font-size: 0.95rem !important;
+  font-size: 0.85rem !important;
   font-weight: 600 !important;
-  margin: 0 0 6px 0 !important;
-  line-height: 1.4 !important;
+  margin: 6px 0 3px 0 !important;
+  line-height: 1.3 !important;
+}
+.sc-nudge-md h2,
+.sc-nudge-md h3 {
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  margin: 4px 0 2px 0 !important;
+  line-height: 1.3 !important;
+}
+.sc-nudge-md p { font-size: 0.8rem !important; margin: 3px 0 !important; }
+.sc-nudge-md ul,
+.sc-nudge-md ol { margin: 3px 0 !important; padding-left: 18px !important; }
+.sc-nudge-md li { font-size: 0.8rem !important; margin: 2px 0 !important; line-height: 1.4 !important; }
+.sc-nudge-md blockquote {
+  margin: 4px 0 4px 6px !important;
+  padding: 2px 8px !important;
+  border-left: 2px solid var(--sc-accent-nudge) !important;
+  font-size: 0.78rem !important;
+  color: var(--sc-text-sec) !important;
+}
+.sc-nudge-md code {
+  font-size: 0.75rem !important;
+  background: #f1f5f9 !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+}
+.sc-nudge-md pre {
+  font-size: 0.75rem !important;
+  background: #f1f5f9 !important;
+  padding: 6px 8px !important;
+  border-radius: 4px !important;
+  margin: 4px 0 !important;
+  overflow-x: auto !important;
 }
 
 /* Sidebar nav items */
@@ -146,13 +179,19 @@ _CSS = """
 /* Chat message bubbles */
 .q-message-text-content { font-size: 13.5px !important; line-height: 1.5 !important; }
 .q-message-name { font-size: 10px !important; color: var(--sc-text-muted) !important; }
+/* Remove any border/outline from bubble wrappers */
+.q-message-text { border: none !important; box-shadow: none !important; outline: none !important; }
 .q-message-text-content--sent {
   background: var(--q-color-primary) !important;
   color: #fff !important;
+  border: none !important;
 }
+/* Coach bubble: no border, subtly different background from user bubble */
 .q-message-text-content--received {
-  background: #f1f5f9 !important;
+  background: #edf0f5 !important;
   color: #0f172a !important;
+  border: none !important;
+  outline: none !important;
 }
 """
 
