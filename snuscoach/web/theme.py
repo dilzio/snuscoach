@@ -182,12 +182,12 @@ _CSS = """
 .q-message-text { border: none !important; box-shadow: none !important; outline: none !important; }
 .q-message-text-content--sent {
   background: var(--q-color-primary) !important;
-  color: #fff !important;
+  color: #0f172a !important;
   border: none !important;
 }
-/* Coach bubble: no border, subtly different background from user bubble */
+/* Coach bubble: light indigo tint to distinguish from user bubble */
 .q-message-text-content--received {
-  background: #edf0f5 !important;
+  background: #eef0fb !important;
   color: #0f172a !important;
   border: none !important;
   outline: none !important;
