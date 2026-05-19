@@ -31,7 +31,7 @@ def test_page_loads(page: Page, ui_base_url: str, path: str, title: str) -> None
 @pytest.mark.parametrize("path,_", ROUTES)
 def test_header_shows_app_name(page: Page, ui_base_url: str, path: str, _: str) -> None:
     page.goto(f"{ui_base_url}{path}")
-    expect(page.locator("text=snuscoach").first).to_be_visible()
+    expect(page.locator(".q-header .q-img").first).to_be_visible()
 
 
 @pytest.mark.parametrize("path,_", ROUTES)

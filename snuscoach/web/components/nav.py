@@ -19,14 +19,15 @@ def _profile_label() -> str:
     except Exception:
         return "No profile"
 
-
 def create_nav(current_path: str = "/") -> None:
     with ui.header().classes("items-center justify-between q-px-md q-py-sm bg-dark"):
-        ui.label("snuscoach").classes("text-white text-bold").style("font-size: 17px; letter-spacing: -0.5px")
+        ui.image("/static/snuscoach_logo.png").classes("sc-logo").style(
+                    "height: 32px; width: 160px; object-fit: contain"
+        )
         ui.badge(_profile_label(), color="grey-7").classes("text-caption")
 
     with ui.left_drawer(fixed=True).style("background: var(--sc-sidebar-bg)").classes("q-pa-sm"):
-        with ui.column().style("gap: 2px; width: 100%"):
+         with ui.column().style("gap: 2px; width: 100%"):
             for label, path, icon in _NAV_LINKS:
                 active = current_path == path
                 extra = " bg-primary text-white" if active else ""
