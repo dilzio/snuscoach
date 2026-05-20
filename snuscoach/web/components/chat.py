@@ -107,8 +107,8 @@ class ChatPanel:
             self._empty_el = None
         self.messages.append({"role": "user", "content": text})
         self._render_message("user", text)
-        await self._get_reply()
         self.scroll.scroll_to(percent=1.0)
+        asyncio.create_task(self._get_reply())
 
     async def _get_reply(self) -> None:
         with self.chat_column:

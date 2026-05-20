@@ -130,7 +130,7 @@ def home_page() -> None:
     panel: list[ChatPanel | None] = [None]
 
     with ui.row().classes("w-full gap-0").style(
-        "height: calc(100vh - 56px); overflow: hidden"
+        "height: calc(100vh - 100px); overflow: hidden"
     ):
         with ui.column().classes("q-pa-md").style(
             "width: 360px; height: 100%; overflow: hidden; flex-shrink: 0; "
