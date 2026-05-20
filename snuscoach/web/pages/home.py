@@ -81,7 +81,7 @@ def _upcoming_meetings_card() -> None:
         key=lambda m: m["date"],
     )[:3]
 
-    with ui.card().classes("sc-card sc-card--meet w-full"):
+    with ui.card().classes("sc-card sc-card--meet w-full cursor-pointer").on("click", lambda: ui.navigate.to("/meetings")):
         with ui.row().classes("items-center gap-2 q-mb-xs"):
             ui.icon("calendar_today", size="xs").style("color: var(--sc-accent-meet)")
             ui.label("Upcoming meetings").classes("sc-label")
@@ -130,10 +130,10 @@ def home_page() -> None:
     panel: list[ChatPanel | None] = [None]
 
     with ui.row().classes("w-full gap-0").style(
-        "height: calc(100vh - 56px); overflow: hidden"
+        "height: calc(100vh - 100px); overflow: hidden"
     ):
         with ui.column().classes("q-pa-md").style(
-            "width: 360px; height: 100%; overflow-y: auto; flex-shrink: 0; "
+            "width: 360px; height: 100%; overflow: hidden; flex-shrink: 0; "
             "gap: 12px; background: var(--sc-content-bg)"
         ):
             _nudge_card(panel)

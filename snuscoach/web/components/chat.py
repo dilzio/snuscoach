@@ -64,12 +64,12 @@ class ChatPanel:
                     ui.markdown(content).classes("text-body2")
 
     def _build(self) -> None:
-        with ui.column().classes("w-full h-full gap-0"):
+        with ui.column().classes("w-full h-full gap-0").style("min-height: 0; overflow: hidden"):
             show_empty = not self.messages and self.empty_state is not None
             if self.empty_state is not None:
                 self._empty_el: ui.column | None = (
                     ui.column()
-                    .classes("flex-1 items-center justify-center gap-3")
+                    .classes("flex-1 w-full items-center justify-center gap-3")
                     .style("padding: 40px 20px")
                 )
                 with self._empty_el:
@@ -79,14 +79,14 @@ class ChatPanel:
             else:
                 self._empty_el = None
 
-            self.scroll = ui.scroll_area().classes("flex-1 w-full")
+            self.scroll = ui.scroll_area().classes("flex-1 w-full").style("min-height: 0")
             self.scroll.set_visibility(not show_empty)
             with self.scroll:
                 self.chat_column = ui.column().classes("w-full gap-2 q-pa-md")
                 for msg in self.messages:
                     self._render_message(msg["role"], msg["content"])
 
-            with ui.row().classes("w-full items-center q-pa-sm gap-2"):
+            with ui.row().classes("w-full items-center q-pa-sm gap-2").style("flex-shrink: 0"):
                 self.input = ui.input(placeholder=self.placeholder).classes(
                     "flex-1"
                 ).props("outlined dense")
@@ -107,8 +107,8 @@ class ChatPanel:
             self._empty_el = None
         self.messages.append({"role": "user", "content": text})
         self._render_message("user", text)
-        await self._get_reply()
         self.scroll.scroll_to(percent=1.0)
+        asyncio.create_task(self._get_reply())
 
     async def _get_reply(self) -> None:
         with self.chat_column:
